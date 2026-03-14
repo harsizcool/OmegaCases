@@ -1,27 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import NextLink from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AppBar, Toolbar, Box, Button, Typography, IconButton,
-  Avatar, Menu, MenuItem, Chip, Divider, useMediaQuery, useTheme,
+  Avatar, Menu, MenuItem, Chip, Divider,
   Drawer, List, ListItem, ListItemText, ListItemButton,
 } from "@mui/material"
 import MenuIcon from "@mui/icons-material/Menu"
-import AccountCircleIcon from "@mui/icons-material/AccountCircle"
 import { useAuth } from "@/lib/auth-context"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const router = useRouter()
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+  const [mounted, setMounted] = useState(false)
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   const handleUserMenu = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)
   const handleCloseMenu = () => setAnchorEl(null)
@@ -69,26 +69,24 @@ export default function Navbar() {
             </Typography>
           </Box>
 
-          {/* Desktop nav */}
-          {!isMobile && (
-            <Box sx={{ display: "flex", gap: 1, flex: 1 }}>
-              {navLinks.map((link) => (
-                <Button
-                  key={link.href}
-                  component={NextLink}
-                  href={link.href}
-                  sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-                >
-                  {link.label}
-                </Button>
-              ))}
-            </Box>
-          )}
+          {/* Desktop nav — hidden on mobile via CSS, no JS media query */}
+          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1, flex: 1 }}>
+            {navLinks.map((link) => (
+              <Button
+                key={link.href}
+                component={NextLink}
+                href={link.href}
+                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+              >
+                {link.label}
+              </Button>
+            ))}
+          </Box>
 
           <Box sx={{ flex: 1 }} />
 
-          {/* Balance chip */}
-          {user && (
+          {/* Balance chip — only render after mount to avoid hydration mismatch */}
+          {mounted && user && (
             <Chip
               label={`$${Number(user.balance).toFixed(2)}`}
               color="primary"
@@ -98,65 +96,68 @@ export default function Navbar() {
             />
           )}
 
-          {/* User menu or login */}
-          {user ? (
-            <>
-              <IconButton onClick={handleUserMenu} size="small">
-                {user.profile_picture ? (
-                  <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
-                ) : (
-                  <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 16 }}>
-                    {user.username[0].toUpperCase()}
-                  </Avatar>
-                )}
-              </IconButton>
-              <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
-                <MenuItem
-                  component={NextLink}
-                  href={`/user/${user.username}`}
-                  onClick={handleCloseMenu}
-                >
-                  My Inventory
-                </MenuItem>
-                {user.admin && (
-                  <MenuItem component={NextLink} href="/admin" onClick={handleCloseMenu}>
-                    Admin Panel
+          {/* User menu or login — only render after mount */}
+          {mounted && (
+            user ? (
+              <>
+                <IconButton onClick={handleUserMenu} size="small">
+                  {user.profile_picture ? (
+                    <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
+                  ) : (
+                    <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 16 }}>
+                      {user.username[0].toUpperCase()}
+                    </Avatar>
+                  )}
+                </IconButton>
+                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
+                  <MenuItem
+                    component={NextLink}
+                    href={`/user/${user.username}`}
+                    onClick={handleCloseMenu}
+                  >
+                    My Inventory
                   </MenuItem>
-                )}
-                <Divider />
-                <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
-                  Logout
-                </MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                component={NextLink}
-                href="/login"
-              >
-                Login
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                component={NextLink}
-                href="/register"
-                sx={{ display: { xs: "none", sm: "flex" } }}
-              >
-                Register
-              </Button>
-            </Box>
+                  {user.admin && (
+                    <MenuItem component={NextLink} href="/admin" onClick={handleCloseMenu}>
+                      Admin Panel
+                    </MenuItem>
+                  )}
+                  <Divider />
+                  <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
+                    Logout
+                  </MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  component={NextLink}
+                  href="/login"
+                >
+                  Login
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  component={NextLink}
+                  href="/register"
+                  sx={{ display: { xs: "none", sm: "flex" } }}
+                >
+                  Register
+                </Button>
+              </Box>
+            )
           )}
 
-          {/* Mobile hamburger */}
-          {isMobile && (
-            <IconButton onClick={() => setMobileOpen(true)} sx={{ ml: 1 }}>
-              <MenuIcon />
-            </IconButton>
-          )}
+          {/* Mobile hamburger — CSS-hidden on desktop */}
+          <IconButton
+            onClick={() => setMobileOpen(true)}
+            sx={{ ml: 1, display: { xs: "flex", md: "none" } }}
+          >
+            <MenuIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -175,7 +176,7 @@ export default function Navbar() {
                 </ListItemButton>
               </ListItem>
             ))}
-            {user && (
+            {mounted && user && (
               <>
                 <Divider />
                 <ListItem disablePadding>
@@ -209,7 +210,9 @@ export default function Navbar() {
         </Box>
       </Drawer>
 
-      <DepositWithdrawModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+      {mounted && (
+        <DepositWithdrawModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+      )}
     </>
   )
 }

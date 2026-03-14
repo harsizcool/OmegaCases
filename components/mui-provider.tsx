@@ -1,6 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { createTheme, ThemeProvider, CssBaseline } from "@mui/material"
+import { CacheProvider } from "@emotion/react"
+import createCache from "@emotion/cache"
+import { useServerInsertedHTML } from "next/navigation"
 import { AuthProvider } from "@/lib/auth-context"
 
 const theme = createTheme({
@@ -63,11 +67,54 @@ const theme = createTheme({
   },
 })
 
+function NextAppDirEmotionCacheProvider({ children }: { children: React.ReactNode }) {
+  const [{ cache, flush }] = React.useState(() => {
+    const emotionCache = createCache({ key: "css" })
+    emotionCache.compat = true
+    const prevInsert = emotionCache.insert.bind(emotionCache)
+    let inserted: string[] = []
+    emotionCache.insert = (...args) => {
+      const serialized = args[1]
+      if (emotionCache.inserted[serialized.name] === undefined) {
+        inserted.push(serialized.name)
+      }
+      return prevInsert(...args)
+    }
+    const flushFn = () => {
+      const prevInserted = inserted
+      inserted = []
+      return prevInserted
+    }
+    return { cache: emotionCache, flush: flushFn }
+  })
+
+  useServerInsertedHTML(() => {
+    const names = flush()
+    if (names.length === 0) return null
+    let styles = ""
+    for (const name of names) {
+      styles += cache.inserted[name]
+    }
+    return (
+      <style
+        key={cache.key}
+        data-emotion={`${cache.key} ${names.join(" ")}`}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: styles }}
+      />
+    )
+  })
+
+  return <CacheProvider value={cache}>{children}</CacheProvider>
+}
+
 export default function MuiProvider({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>{children}</AuthProvider>
-    </ThemeProvider>
+    <NextAppDirEmotionCacheProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
+    </NextAppDirEmotionCacheProvider>
   )
 }
