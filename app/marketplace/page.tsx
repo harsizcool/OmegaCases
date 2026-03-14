@@ -1,42 +1,102 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Container, Grid, Box, Typography, Card, CardContent, CardMedia,
   Chip, Slider, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Alert, Divider, Avatar, IconButton, Tooltip,
-  useMediaQuery, useTheme, Drawer,
+  CircularProgress, Alert, Avatar, Drawer,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import AddIcon from "@mui/icons-material/Add"
-import { LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from "recharts"
+import OpenInNewIcon from "@mui/icons-material/OpenInNew"
 import { useAuth } from "@/lib/auth-context"
-import type { Listing, Rarity, Sale, InventoryItem } from "@/lib/types"
+import type { Listing, Rarity, InventoryItem } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import NextLink from "next/link"
+import { useRouter } from "next/navigation"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
+const MAX_LISTING_PRICE = 800
+
+// Extracted as a stable top-level component to prevent remounting on parent re-render
+function FilterPanel({
+  search, setSearch, rarity, setRarity, priceRange, setPriceRange, sortBy, setSortBy, onApply,
+}: {
+  search: string
+  setSearch: (v: string) => void
+  rarity: string
+  setRarity: (v: string) => void
+  priceRange: [number, number]
+  setPriceRange: (v: [number, number]) => void
+  sortBy: string
+  setSortBy: (v: string) => void
+  onApply: () => void
+}) {
+  return (
+    <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
+      <Card sx={{ p: 2, position: { md: "sticky" }, top: { md: 80 } }}>
+        <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+          Filters
+        </Typography>
+        <TextField
+          label="Search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          fullWidth
+          size="small"
+          sx={{ mb: 2 }}
+          autoComplete="off"
+        />
+        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+          <InputLabel>Rarity</InputLabel>
+          <Select value={rarity} onChange={(e) => setRarity(e.target.value)} label="Rarity">
+            <MenuItem value="">All</MenuItem>
+            {RARITIES.map((r) => (
+              <MenuItem key={r} value={r}>
+                <Chip label={r} size="small" sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", mr: 1 }} />
+                {r}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Typography variant="caption" color="text.secondary">
+          Price range: ${priceRange[0]} – ${priceRange[1]}
+        </Typography>
+        <Slider
+          value={priceRange}
+          onChange={(_, v) => setPriceRange(v as [number, number])}
+          min={0}
+          max={800}
+          step={1}
+          sx={{ mt: 1, mb: 2 }}
+        />
+        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+          <InputLabel>Sort by</InputLabel>
+          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} label="Sort by">
+            <MenuItem value="created_at">Newest</MenuItem>
+            <MenuItem value="price">Price</MenuItem>
+          </Select>
+        </FormControl>
+        <Button variant="outlined" fullWidth onClick={onApply}>
+          Apply
+        </Button>
+      </Card>
+    </Box>
+  )
+}
 
 export default function MarketplacePage() {
   const { user, refreshUser } = useAuth()
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+  const router = useRouter()
 
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [rarity, setRarity] = useState("")
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500])
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 800])
   const [sortBy, setSortBy] = useState("created_at")
   const [filterOpen, setFilterOpen] = useState(false)
-
-  // Buy dialog
-  const [buyTarget, setBuyTarget] = useState<Listing | null>(null)
-  const [buyLoading, setBuyLoading] = useState(false)
-  const [buyError, setBuyError] = useState("")
-  const [buySuccess, setBuySuccess] = useState(false)
 
   // Sell dialog
   const [sellOpen, setSellOpen] = useState(false)
@@ -47,72 +107,49 @@ export default function MarketplacePage() {
   const [sellError, setSellError] = useState("")
   const [sellSuccess, setSellSuccess] = useState(false)
 
-  // Price chart
-  const [chartItem, setChartItem] = useState<string | null>(null)
-  const [chartData, setChartData] = useState<Sale[]>([])
-
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (rarity) params.set("rarity", rarity)
     if (priceRange[0] > 0) params.set("minPrice", String(priceRange[0]))
-    if (priceRange[1] < 500) params.set("maxPrice", String(priceRange[1]))
+    if (priceRange[1] < 800) params.set("maxPrice", String(priceRange[1]))
     if (search) params.set("search", search)
     params.set("sortBy", sortBy)
     const res = await fetch(`/api/listings?${params}`)
     const data = await res.json()
     setListings(Array.isArray(data) ? data : [])
     setLoading(false)
-  }
+  }, [rarity, priceRange, sortBy, search])
 
-  useEffect(() => { fetchListings() }, [rarity, priceRange, sortBy])
+  // Debounce on search; instant on filter changes
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    const t = setTimeout(fetchListings, 300)
-    return () => clearTimeout(t)
-  }, [search])
-
-  const fetchChart = async (itemId: string) => {
-    const res = await fetch(`/api/sales?item_id=${itemId}`)
-    const data = await res.json()
-    setChartData(data)
-    setChartItem(itemId)
-  }
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    searchTimeout.current = setTimeout(fetchListings, 300)
+    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current) }
+  }, [fetchListings])
 
   const fetchMyInventory = async () => {
     if (!user) return
-    const res = await fetch(`/api/listings`)
-    const allListings: Listing[] = await res.json()
-    const listedInvIds = new Set(allListings.filter((l) => l.seller_id === user.id).map((l) => l.inventory_id))
-
+    const allListingsRes = await fetch("/api/listings")
+    const allListings: Listing[] = await allListingsRes.json()
+    const listedInvIds = new Set(
+      Array.isArray(allListings)
+        ? allListings.filter((l) => l.seller_id === user.id).map((l) => l.inventory_id)
+        : []
+    )
     const invRes = await fetch(`/api/inventory/${user.id}`)
     const data: InventoryItem[] = await invRes.json()
-    setMyInventory(data.filter((inv) => !listedInvIds.has(inv.id)))
-  }
-
-  const handleBuy = async () => {
-    if (!buyTarget || !user) return
-    setBuyLoading(true)
-    setBuyError("")
-    try {
-      const res = await fetch(`/api/listings/${buyTarget.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buyer_id: user.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setBuySuccess(true)
-      fetchListings()
-      await refreshUser()
-    } catch (e: any) {
-      setBuyError(e.message)
-    } finally {
-      setBuyLoading(false)
-    }
+    setMyInventory(Array.isArray(data) ? data.filter((inv) => !listedInvIds.has(inv.id)) : [])
   }
 
   const handleSell = async () => {
     if (!sellItem || !sellPrice || !user) return
+    const price = parseFloat(sellPrice)
+    if (price > MAX_LISTING_PRICE) {
+      setSellError(`Max listing price is $${MAX_LISTING_PRICE}`)
+      return
+    }
     setSellLoading(true)
     setSellError("")
     try {
@@ -123,7 +160,7 @@ export default function MarketplacePage() {
           seller_id: user.id,
           inventory_id: sellItem.id,
           item_id: sellItem.item_id,
-          price: parseFloat(sellPrice),
+          price,
         }),
       })
       const data = await res.json()
@@ -137,73 +174,27 @@ export default function MarketplacePage() {
     }
   }
 
-  const FilterPanel = () => (
-    <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
-      <Card sx={{ p: 2, position: { md: "sticky" }, top: { md: 80 } }}>
-        <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-          Filters
-        </Typography>
-        <TextField
-          label="Search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          fullWidth
-          size="small"
-          sx={{ mb: 2 }}
-        />
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Rarity</InputLabel>
-          <Select value={rarity} onChange={(e) => setRarity(e.target.value)} label="Rarity">
-            <MenuItem value="">All</MenuItem>
-            {RARITIES.map((r) => (
-              <MenuItem key={r} value={r}>
-                <Chip
-                  label={r}
-                  size="small"
-                  sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", mr: 1 }}
-                />
-                {r}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Typography variant="caption" color="text.secondary">
-          Price range: ${priceRange[0]} – ${priceRange[1]}
-        </Typography>
-        <Slider
-          value={priceRange}
-          onChange={(_, v) => setPriceRange(v as [number, number])}
-          min={0}
-          max={500}
-          step={1}
-          sx={{ mt: 1, mb: 2 }}
-        />
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Sort by</InputLabel>
-          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} label="Sort by">
-            <MenuItem value="created_at">Newest</MenuItem>
-            <MenuItem value="price">Price</MenuItem>
-          </Select>
-        </FormControl>
-        <Button variant="outlined" fullWidth onClick={fetchListings}>
-          Apply
-        </Button>
-      </Card>
-    </Box>
-  )
+  const filterProps = {
+    search, setSearch,
+    rarity, setRarity,
+    priceRange, setPriceRange,
+    sortBy, setSortBy,
+    onApply: fetchListings,
+  }
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Marketplace
-        </Typography>
+        <Typography variant="h5" fontWeight={700}>Marketplace</Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
-          {isMobile && (
-            <Button startIcon={<FilterListIcon />} variant="outlined" onClick={() => setFilterOpen(true)}>
-              Filter
-            </Button>
-          )}
+          <Button
+            startIcon={<FilterListIcon />}
+            variant="outlined"
+            onClick={() => setFilterOpen(true)}
+            sx={{ display: { md: "none" } }}
+          >
+            Filter
+          </Button>
           {user && (
             <Button
               startIcon={<AddIcon />}
@@ -217,9 +208,10 @@ export default function MarketplacePage() {
       </Box>
 
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        {!isMobile && <FilterPanel />}
+        <Box sx={{ display: { xs: "none", md: "block" } }}>
+          <FilterPanel {...filterProps} />
+        </Box>
 
-        {/* Listings grid */}
         <Box sx={{ flex: 1 }}>
           {loading ? (
             <Box textAlign="center" py={8}><CircularProgress /></Box>
@@ -236,12 +228,15 @@ export default function MarketplacePage() {
                 return (
                   <Grid item key={listing.id} xs={6} sm={4} md={3} lg={2}>
                     <Card
+                      component={NextLink}
+                      href={`/listing/${listing.id}`}
                       sx={{
                         cursor: "pointer",
+                        textDecoration: "none",
+                        display: "block",
                         border: `1px solid ${color}33`,
                         "&:hover": { boxShadow: `0 4px 20px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
                       }}
-                      onClick={() => fetchChart(listing.item_id)}
                     >
                       <CardMedia
                         component="img"
@@ -259,7 +254,7 @@ export default function MarketplacePage() {
                           variant="caption"
                           display="block"
                           fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}
                         >
                           {item.name}
                         </Typography>
@@ -269,35 +264,6 @@ export default function MarketplacePage() {
                         <Typography variant="caption" color="text.secondary" display="block">
                           by {listing.users?.username || "—"}
                         </Typography>
-                        {user && listing.seller_id !== user.id && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            fullWidth
-                            startIcon={<ShoppingCartIcon fontSize="small" />}
-                            sx={{ mt: 0.5, fontSize: "0.7rem" }}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setBuyTarget(listing)
-                              setBuyError("")
-                              setBuySuccess(false)
-                            }}
-                          >
-                            Buy
-                          </Button>
-                        )}
-                        {!user && (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                            component={NextLink}
-                            href="/login"
-                            sx={{ mt: 0.5, fontSize: "0.7rem" }}
-                          >
-                            Login to buy
-                          </Button>
-                        )}
                       </CardContent>
                     </Card>
                   </Grid>
@@ -305,79 +271,22 @@ export default function MarketplacePage() {
               })}
             </Grid>
           )}
-
-          {/* Price chart */}
-          {chartItem && chartData.length > 0 && (
-            <Card sx={{ mt: 3, p: 2 }}>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                Recent Sale Prices
-              </Typography>
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={[...chartData].reverse()}>
-                  <XAxis
-                    dataKey="sold_at"
-                    tickFormatter={(v) => new Date(v).toLocaleDateString()}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
-                  <RTooltip
-                    formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "Price"]}
-                    labelFormatter={(l) => new Date(l).toLocaleString()}
-                  />
-                  <Line type="monotone" dataKey="price" stroke="#1976d2" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-          )}
         </Box>
       </Box>
 
       {/* Mobile filter drawer */}
       <Drawer anchor="left" open={filterOpen} onClose={() => setFilterOpen(false)}>
         <Box sx={{ p: 2, width: 280 }}>
-          <FilterPanel />
+          <FilterPanel {...filterProps} />
         </Box>
       </Drawer>
-
-      {/* Buy dialog */}
-      <Dialog open={Boolean(buyTarget)} onClose={() => setBuyTarget(null)}>
-        <DialogTitle>Confirm Purchase</DialogTitle>
-        <DialogContent>
-          {buyTarget && (
-            <Box>
-              <Typography gutterBottom>
-                Buy <strong>{buyTarget.items?.name}</strong> for{" "}
-                <strong>${Number(buyTarget.price).toFixed(2)}</strong>?
-              </Typography>
-              {user && (
-                <Typography variant="body2" color="text.secondary">
-                  Your balance: ${Number(user.balance).toFixed(2)}
-                </Typography>
-              )}
-              {buyError && <Alert severity="error" sx={{ mt: 1 }}>{buyError}</Alert>}
-              {buySuccess && <Alert severity="success" sx={{ mt: 1 }}>Purchased!</Alert>}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBuyTarget(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleBuy}
-            disabled={buyLoading || buySuccess}
-            startIcon={buyLoading ? <CircularProgress size={14} /> : null}
-          >
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Sell dialog */}
       <Dialog open={sellOpen} onClose={() => setSellOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>List Item for Sale</DialogTitle>
         <DialogContent>
           {myInventory.length === 0 ? (
-            <Typography color="text.secondary">No items available to list.</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>No items available to list.</Typography>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
               <FormControl fullWidth>
@@ -393,28 +302,23 @@ export default function MarketplacePage() {
                 >
                   {myInventory.map((inv) => (
                     <MenuItem key={inv.id} value={inv.id}>
-                      {inv.items?.name} (
+                      {inv.items?.name} —{" "}
                       <Chip
                         label={inv.items?.rarity}
                         size="small"
-                        sx={{
-                          bgcolor: RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"],
-                          color: "#fff",
-                          ml: 0.5,
-                          fontSize: "0.6rem",
-                        }}
+                        sx={{ bgcolor: RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"], color: "#fff", ml: 0.5, fontSize: "0.6rem" }}
                       />
-                      ) — ${Number(inv.items?.market_price || 0).toFixed(2)}
+                      {" "}— ${Number(inv.items?.market_price || 0).toFixed(2)}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
               <TextField
-                label="Your Price (USD)"
+                label={`Your Price (USD, max $${MAX_LISTING_PRICE})`}
                 type="number"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
-                inputProps={{ min: 0.01, step: 0.01 }}
+                inputProps={{ min: 0.01, max: MAX_LISTING_PRICE, step: 0.01 }}
                 fullWidth
               />
               {sellError && <Alert severity="error">{sellError}</Alert>}
@@ -427,10 +331,9 @@ export default function MarketplacePage() {
           <Button
             variant="contained"
             onClick={handleSell}
-            disabled={sellLoading || !sellItem || !sellPrice}
-            startIcon={sellLoading ? <CircularProgress size={14} /> : null}
+            disabled={sellLoading || !sellItem || !sellPrice || sellSuccess}
           >
-            List
+            {sellLoading ? "Listing..." : "List"}
           </Button>
         </DialogActions>
       </Dialog>

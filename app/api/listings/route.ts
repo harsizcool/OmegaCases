@@ -1,15 +1,31 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-// GET: All active listings (with optional filters)
+const MAX_LISTING_PRICE = 800
+
+// GET: All active listings (with optional filters), or single listing by ?id=
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
+  const id = searchParams.get("id")
   const rarity = searchParams.get("rarity")
   const minPrice = searchParams.get("minPrice")
   const maxPrice = searchParams.get("maxPrice")
   const search = searchParams.get("search")
   const sortBy = searchParams.get("sortBy") || "created_at"
   const sortDir = searchParams.get("sortDir") === "asc" ? true : false
+
+  const supabase = await createClient()
+
+  // Single listing fetch for /listing/[id] page
+  if (id) {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("*, items(*), users(id, username, profile_picture)")
+      .eq("id", id)
+      .single()
+    if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    return NextResponse.json(data)
+  }
 
   const supabase = await createClient()
 
@@ -53,6 +69,13 @@ export async function POST(request: Request) {
     .single()
 
   if (!inv) return NextResponse.json({ error: "Item not in your inventory" }, { status: 403 })
+
+  if (price > MAX_LISTING_PRICE) {
+    return NextResponse.json({ error: `Max listing price is $${MAX_LISTING_PRICE}` }, { status: 400 })
+  }
+  if (price <= 0) {
+    return NextResponse.json({ error: "Price must be greater than 0" }, { status: 400 })
+  }
 
   // Check not already listed
   const { data: existing } = await supabase

@@ -34,6 +34,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: "Marketplace", href: "/marketplace" },
+    { label: "Trade", href: "/trade" },
     { label: "Leaderboard", href: "/leaderboard" },
   ]
 
