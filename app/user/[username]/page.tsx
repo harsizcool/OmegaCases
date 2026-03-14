@@ -1,16 +1,32 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import {
   Container, Box, Typography, Avatar, Grid, Card, CardContent,
   CardMedia, Chip, CircularProgress, Alert, Button, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField,
+  Select, MenuItem, FormControl, InputLabel, FormControlLabel,
+  Checkbox, Badge,
 } from "@mui/material"
 import { useAuth } from "@/lib/auth-context"
 import type { InventoryItem, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import NextLink from "next/link"
+
+type SortMode = "rap" | "latest"
+
+interface BundledItem {
+  item_id: string
+  name: string
+  image_url: string
+  rarity: Rarity
+  rap: number
+  market_price: number
+  count: number
+  // for listing — the oldest inventory entry
+  inventoryId: string
+}
 
 export default function UserPage() {
   const params = useParams()
@@ -22,8 +38,11 @@ export default function UserPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
+  const [sortMode, setSortMode] = useState<SortMode>("rap")
+  const [bundle, setBundle] = useState(true)
+
   // List item dialog
-  const [listTarget, setListTarget] = useState<InventoryItem | null>(null)
+  const [listTarget, setListTarget] = useState<{ inventoryId: string; item: { name: string; market_price: number } } | null>(null)
   const [listPrice, setListPrice] = useState("")
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState("")
@@ -48,18 +67,75 @@ export default function UserPage() {
   const rapValue = inventory.reduce((sum, inv) => sum + Number(inv.items?.rap || 0), 0)
   const isMe = me?.username === username
 
+  // Build bundled view
+  const bundledItems = useMemo<BundledItem[]>(() => {
+    const map = new Map<string, BundledItem>()
+    // Sort by obtained_at ascending so the oldest inventoryId is picked per bundle
+    const sorted = [...inventory].sort((a, b) =>
+      new Date(a.obtained_at).getTime() - new Date(b.obtained_at).getTime()
+    )
+    for (const inv of sorted) {
+      const item = inv.items
+      if (!item) continue
+      if (map.has(inv.item_id)) {
+        map.get(inv.item_id)!.count++
+      } else {
+        map.set(inv.item_id, {
+          item_id: inv.item_id,
+          name: item.name,
+          image_url: item.image_url,
+          rarity: item.rarity as Rarity,
+          rap: Number(item.rap),
+          market_price: Number(item.market_price),
+          count: 1,
+          inventoryId: inv.id,
+        })
+      }
+    }
+    return Array.from(map.values())
+  }, [inventory])
+
+  // Sorted individual items
+  const sortedInventory = useMemo(() => {
+    return [...inventory].sort((a, b) => {
+      if (sortMode === "rap") return Number(b.items?.rap || 0) - Number(a.items?.rap || 0)
+      return new Date(b.obtained_at).getTime() - new Date(a.obtained_at).getTime()
+    })
+  }, [inventory, sortMode])
+
+  // Sorted bundled items
+  const sortedBundled = useMemo(() => {
+    return [...bundledItems].sort((a, b) => {
+      if (sortMode === "rap") return b.rap - a.rap
+      // "latest" for bundles: sort by highest count, then by rap
+      return b.rap - a.rap
+    })
+  }, [bundledItems, sortMode])
+
+  const openListDialog = (inventoryId: string, item: { name: string; market_price: number }) => {
+    setListTarget({ inventoryId, item })
+    setListPrice(String(item.market_price))
+    setListError("")
+    setListSuccess(false)
+  }
+
   const handleList = async () => {
     if (!listTarget || !listPrice || !me) return
     setListLoading(true)
     setListError("")
     try {
+      // Find the actual inventory row for this item owned by me
+      const invRow = inventory.find(
+        (inv) => inv.id === listTarget.inventoryId
+      )
+      if (!invRow) throw new Error("Item not found in inventory")
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           seller_id: me.id,
-          inventory_id: listTarget.id,
-          item_id: listTarget.item_id,
+          inventory_id: invRow.id,
+          item_id: invRow.item_id,
           price: parseFloat(listPrice),
         }),
       })
@@ -98,7 +174,10 @@ export default function UserPage() {
             <strong style={{ color: "#1976d2" }}>${rapValue.toFixed(2)}</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {inventory.length} items
+            {inventory.length} item{inventory.length !== 1 ? "s" : ""}
+            {bundle && bundledItems.length !== inventory.length && (
+              <> &middot; {bundledItems.length} unique</>
+            )}
           </Typography>
         </Box>
         {isMe && (
@@ -110,13 +189,98 @@ export default function UserPage() {
         )}
       </Box>
 
+      {/* Controls */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Sort By</InputLabel>
+          <Select
+            value={sortMode}
+            label="Sort By"
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+          >
+            <MenuItem value="rap">Sort by RAP</MenuItem>
+            <MenuItem value="latest">Sort by Latest</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={bundle}
+              onChange={(e) => setBundle(e.target.checked)}
+              size="small"
+            />
+          }
+          label="Bundle Similar Items"
+        />
+      </Box>
+
       {inventory.length === 0 ? (
         <Box textAlign="center" py={6}>
           <Typography color="text.secondary">No items in inventory</Typography>
         </Box>
-      ) : (
+      ) : bundle ? (
+        // Bundled grid
         <Grid container spacing={2}>
-          {inventory.map((inv) => {
+          {sortedBundled.map((b) => {
+            const color = RARITY_COLORS[b.rarity]
+            return (
+              <Grid item key={b.item_id} xs={6} sm={4} md={3} lg={2}>
+                <Badge
+                  badgeContent={b.count > 1 ? `x${b.count}` : null}
+                  color="primary"
+                  sx={{ display: "block", "& .MuiBadge-badge": { fontSize: "0.7rem", fontWeight: 700, right: 8, top: 8 } }}
+                >
+                  <Card
+                    sx={{
+                      border: `1px solid ${color}44`,
+                      "&:hover": { boxShadow: `0 4px 16px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
+                    }}
+                  >
+                    <CardMedia
+                      component="img"
+                      image={b.image_url}
+                      alt={b.name}
+                      sx={{ height: 110, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
+                    />
+                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                      <Chip
+                        label={b.rarity}
+                        size="small"
+                        sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
+                      />
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        fontWeight={600}
+                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
+                        {b.name}
+                      </Typography>
+                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
+                        RAP: ${b.rap.toFixed(2)}
+                      </Typography>
+                      {isMe && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          fullWidth
+                          sx={{ mt: 0.5, fontSize: "0.65rem" }}
+                          onClick={() => openListDialog(b.inventoryId, { name: b.name, market_price: b.market_price })}
+                        >
+                          Sell
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Badge>
+              </Grid>
+            )
+          })}
+        </Grid>
+      ) : (
+        // Individual grid
+        <Grid container spacing={2}>
+          {sortedInventory.map((inv) => {
             const item = inv.items
             if (!item) return null
             const color = RARITY_COLORS[item.rarity as Rarity]
@@ -157,7 +321,7 @@ export default function UserPage() {
                         size="small"
                         fullWidth
                         sx={{ mt: 0.5, fontSize: "0.65rem" }}
-                        onClick={() => { setListTarget(inv); setListPrice(String(item.market_price)); setListError(""); setListSuccess(false) }}
+                        onClick={() => openListDialog(inv.id, { name: item.name, market_price: Number(item.market_price) })}
                       >
                         Sell
                       </Button>
@@ -172,7 +336,7 @@ export default function UserPage() {
 
       {/* List item dialog */}
       <Dialog open={Boolean(listTarget)} onClose={() => setListTarget(null)}>
-        <DialogTitle>List "{listTarget?.items?.name}"</DialogTitle>
+        <DialogTitle>List "{listTarget?.item?.name}"</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <TextField
@@ -193,9 +357,8 @@ export default function UserPage() {
             variant="contained"
             onClick={handleList}
             disabled={listLoading || listSuccess}
-            startIcon={listLoading ? <CircularProgress size={14} /> : null}
           >
-            List
+            {listLoading ? "Listing..." : "List"}
           </Button>
         </DialogActions>
       </Dialog>
