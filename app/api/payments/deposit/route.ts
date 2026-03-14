@@ -7,6 +7,8 @@ const NOWPAYMENTS_API = "https://api.nowpayments.io/v1"
 export async function POST(request: Request) {
   const { user_id, amount, currency } = await request.json()
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://omega-cases.vercel.app"
+
   const res = await fetch(`${NOWPAYMENTS_API}/payment`, {
     method: "POST",
     headers: {
@@ -18,6 +20,8 @@ export async function POST(request: Request) {
       price_currency: "usd",
       pay_currency: currency.toLowerCase(),
       order_description: `OmegaCases deposit for user ${user_id}`,
+      ipn_callback_url: `${appUrl}/api/payments/webhook`,
+      order_id: `oc_${user_id}_${Date.now()}`,
     }),
   })
 

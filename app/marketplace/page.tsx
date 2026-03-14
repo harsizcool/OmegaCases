@@ -140,7 +140,13 @@ export default function MarketplacePage() {
     )
     const invRes = await fetch(`/api/inventory/${user.id}`)
     const data: InventoryItem[] = await invRes.json()
-    setMyInventory(Array.isArray(data) ? data.filter((inv) => !listedInvIds.has(inv.id)) : [])
+    const available = Array.isArray(data) ? data.filter((inv) => !listedInvIds.has(inv.id)) : []
+    setMyInventory(available)
+    // Re-sync sellItem in case the array reference changed; clear if no longer available
+    setSellItem((prev) => {
+      if (!prev) return null
+      return available.find((i) => i.id === prev.id) ?? null
+    })
   }
 
   const handleSell = async () => {
@@ -199,7 +205,7 @@ export default function MarketplacePage() {
             <Button
               startIcon={<AddIcon />}
               variant="contained"
-              onClick={() => { fetchMyInventory(); setSellOpen(true); setSellSuccess(false) }}
+              onClick={() => { setSellItem(null); setSellPrice(""); fetchMyInventory(); setSellOpen(true); setSellSuccess(false) }}
             >
               List Item
             </Button>

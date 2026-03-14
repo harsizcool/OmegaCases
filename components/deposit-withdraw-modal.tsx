@@ -7,6 +7,7 @@ import {
   MenuItem, Select, FormControl, InputLabel, CircularProgress,
   Alert, Divider, Chip,
 } from "@mui/material"
+import Link from "next/link"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import { useAuth } from "@/lib/auth-context"
 import { ACCEPTED_CRYPTOS } from "@/lib/types"
@@ -72,8 +73,8 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
   const handleWithdraw = async () => {
     setWithdrawError("")
     setWithdrawSuccess(false)
-    if (!withdrawAmount || Number(withdrawAmount) < 1) {
-      setWithdrawError("Minimum withdrawal is $1.00")
+    if (!withdrawAmount || Number(withdrawAmount) < 3) {
+      setWithdrawError("Minimum withdrawal is $3.00")
       return
     }
     if (!withdrawWallet.trim()) {
@@ -242,6 +243,20 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
             {withdrawSuccess && (
               <Alert severity="success">
                 Withdrawal request submitted! Processing is handled manually, usually within 24h.
+              </Alert>
+            )}
+            {withdrawAmount && Number(withdrawAmount) >= 3 && Number(withdrawAmount) <= 5 && !withdrawSuccess && (
+              <Alert
+                severity="warning"
+                icon={false}
+                sx={{ alignItems: "flex-start" }}
+              >
+                Are you sure you want to cash out such a low amount? You won't be gaining much.
+                Why not{" "}
+                <Link href="/marketplace" onClick={onClose} style={{ color: "inherit", fontWeight: 700 }}>
+                  invest it in items
+                </Link>{" "}
+                instead?
               </Alert>
             )}
             <Button
