@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: "Registration failed" }, { status: 500 })
+    console.error("[register] Supabase insert error:", error.message)
+    return NextResponse.json({ error: error.message || "Registration failed" }, { status: 500 })
   }
 
   const { password: _pw, ...safeUser } = newUser
