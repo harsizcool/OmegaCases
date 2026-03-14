@@ -121,5 +121,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-color: #ffffff;
   }
+}
+
+/* MUI compatibility — remove conflicting reset */
+*, *::before, *::after {
+  box-sizing: border-box;
 }

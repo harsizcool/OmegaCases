@@ -1,32 +1,21 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import MuiProvider from '@/components/mui-provider'
+import Navbar from '@/components/navbar'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'OmegaCases — Open Cases, Win Rare Items',
+  description: 'OmegaCases is a CS2-style case opening economy website. Open cases, win rare skins, trade on the marketplace.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#1976d2',
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -36,8 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
-        {children}
+      <body>
+        <MuiProvider>
+          <Navbar />
+          <main>{children}</main>
+        </MuiProvider>
         <Analytics />
       </body>
     </html>

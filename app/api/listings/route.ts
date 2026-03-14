@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+
+// GET: All active listings (with optional filters)
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const rarity = searchParams.get("rarity")
+  const minPrice = searchParams.get("minPrice")
+  const maxPrice = searchParams.get("maxPrice")
+  const search = searchParams.get("search")
+  const sortBy = searchParams.get("sortBy") || "created_at"
+  const sortDir = searchParams.get("sortDir") === "asc" ? true : false
+
+  const supabase = await createClient()
+
+  let query = supabase
+    .from("listings")
+    .select("*, items(*), users(id, username, profile_picture)")
+    .eq("status", "active")
+    .order(sortBy === "price" ? "price" : "created_at", { ascending: sortDir })
+
+  if (rarity) query = query.eq("items.rarity", rarity)
+  if (minPrice) query = query.gte("price", parseFloat(minPrice))
+  if (maxPrice) query = query.lte("price", parseFloat(maxPrice))
+
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  let listings = data || []
+
+  if (rarity) {
+    listings = listings.filter((l: any) => l.items?.rarity === rarity)
+  }
+  if (search) {
+    const s = search.toLowerCase()
+    listings = listings.filter((l: any) => l.items?.name?.toLowerCase().includes(s))
+  }
+
+  return NextResponse.json(listings)
+}
+
+// POST: Create listing
+export async function POST(request: Request) {
+  const { seller_id, inventory_id, item_id, price } = await request.json()
+  const supabase = await createClient()
+
+  // Verify inventory ownership
+  const { data: inv } = await supabase
+    .from("inventory")
+    .select("*")
+    .eq("id", inventory_id)
+    .eq("user_id", seller_id)
+    .single()
+
+  if (!inv) return NextResponse.json({ error: "Item not in your inventory" }, { status: 403 })
+
+  // Check not already listed
+  const { data: existing } = await supabase
+    .from("listings")
+    .select("id")
+    .eq("inventory_id", inventory_id)
+    .eq("status", "active")
+    .single()
+
+  if (existing) return NextResponse.json({ error: "Item already listed" }, { status: 400 })
+
+  const { data, error } = await supabase
+    .from("listings")
+    .insert({ seller_id, item_id, inventory_id, price })
+    .select("*")
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}
