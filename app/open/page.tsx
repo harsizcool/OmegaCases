@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Container, Box, Typography, Button, Grid, Card, CardContent,
   Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Alert, ButtonGroup, Divider,
+  Alert, Divider, Badge,
 } from "@mui/material"
 import LockIcon from "@mui/icons-material/Lock"
+import InventoryIcon from "@mui/icons-material/Inventory"
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import { useAuth } from "@/lib/auth-context"
 import CaseSpinner from "@/components/case-spinner"
 import Confetti from "@/components/confetti"
@@ -32,13 +34,12 @@ export default function OpenPage() {
   const [items, setItems] = useState<Item[]>([])
   const [selectedQty, setSelectedQty] = useState<number>(10)
   const [spinning, setSpinning] = useState(false)
-  const [wonItems, setWonItems] = useState<Item[]>([])
-  const [currentTarget, setCurrentTarget] = useState<Item | null>(null)
-  const [spinIndex, setSpinIndex] = useState(0)
+  const [targetItem, setTargetItem] = useState<Item | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [lastWon, setLastWon] = useState<Item | null>(null)
   const [confettiActive, setConfettiActive] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [spinLoading, setSpinLoading] = useState(false)
+  const [buyLoading, setBuyLoading] = useState(false)
   const [error, setError] = useState("")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
 
@@ -47,17 +48,19 @@ export default function OpenPage() {
   }, [])
 
   const selectedPrice = CASE_PRICES.find((p) => p.qty === selectedQty)!
+  const casesRemaining = user?.cases_remaining ?? 0
 
-  const startOpenSession = async () => {
+  // Buy cases: deduct balance, add to cases_remaining only
+  const handleBuyCases = async () => {
     if (!user) return
     if (Number(user.balance) < selectedPrice.price) {
       setBuyModalOpen(true)
       return
     }
     setError("")
-    setLoading(true)
+    setBuyLoading(true)
     try {
-      const res = await fetch("/api/cases/open", {
+      const res = await fetch("/api/cases/buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id, qty: selectedQty }),
@@ -65,28 +68,47 @@ export default function OpenPage() {
       const data = await res.json()
       if (!res.ok) {
         if (res.status === 402) { setBuyModalOpen(true); return }
-        throw new Error(data.error || "Failed")
+        throw new Error(data.error || "Failed to buy cases")
       }
       await refreshUser()
-      setWonItems(data.wonItems)
-      setSpinIndex(0)
-      setCurrentTarget(data.wonItems[0])
-      setSpinning(true)
-      setShowResult(false)
     } catch (e: any) {
       setError(e.message)
     } finally {
-      setLoading(false)
+      setBuyLoading(false)
+    }
+  }
+
+  // Spin: consume 1 case_remaining, get 1 item
+  const handleSpin = async () => {
+    if (!user || casesRemaining < 1 || spinning) return
+    setError("")
+    setShowResult(false)
+    setSpinLoading(true)
+    try {
+      const res = await fetch("/api/cases/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to open case")
+      setTargetItem(data.wonItem)
+      await refreshUser()
+      setSpinning(true)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setSpinLoading(false)
     }
   }
 
   const handleSpinComplete = useCallback(() => {
-    const item = wonItems[spinIndex]
-    setLastWon(item)
+    if (!targetItem) return
+    setLastWon(targetItem)
     setShowResult(true)
     setSpinning(false)
 
-    if (CONFETTI_RARITIES.includes(item.rarity as Rarity)) {
+    if (CONFETTI_RARITIES.includes(targetItem.rarity as Rarity)) {
       setConfettiActive(true)
       playSound(CONFETTI_SRC)
       playSound(BORING_SRC)
@@ -94,19 +116,14 @@ export default function OpenPage() {
     } else {
       playSound(BORING_SRC)
     }
-  }, [wonItems, spinIndex])
+  }, [targetItem])
 
   const handleSpinAgain = () => {
-    const next = spinIndex + 1
-    if (next >= wonItems.length) return
-    setSpinIndex(next)
-    setCurrentTarget(wonItems[next])
     setShowResult(false)
-    setSpinning(true)
+    setLastWon(null)
+    setTargetItem(null)
+    handleSpin()
   }
-
-  const cost = selectedPrice.price
-  const canSpinAgain = spinIndex < wonItems.length - 1
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -128,48 +145,45 @@ export default function OpenPage() {
 
       {user && (
         <>
-          {/* Quantity selector */}
-          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 4, flexWrap: "wrap" }}>
-            {CASE_PRICES.map((preset) => (
-              <Card
-                key={preset.qty}
-                onClick={() => !spinning && setSelectedQty(preset.qty)}
-                sx={{
-                  cursor: spinning ? "not-allowed" : "pointer",
-                  border: selectedQty === preset.qty ? "2px solid #1976d2" : "2px solid transparent",
-                  boxShadow: selectedQty === preset.qty ? "0 0 12px #1976d244" : undefined,
-                  transition: "all 0.15s",
-                  minWidth: 110,
-                }}
-              >
-                <CardContent sx={{ textAlign: "center", py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                  <Typography variant="h5" fontWeight={700} color="primary.main">
-                    x{preset.qty}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    ${preset.price}
-                  </Typography>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-
-          {/* Balance check */}
-          <Box textAlign="center" sx={{ mb: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              Balance: <strong>${Number(user.balance).toFixed(2)}</strong> &nbsp;|&nbsp; Cost:{" "}
-              <strong>${cost}</strong>
-            </Typography>
+          {/* Balance + cases remaining bar */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 3,
+              mb: 4,
+              flexWrap: "wrap",
+            }}
+          >
+            <Chip
+              label={`Balance: $${Number(user.balance).toFixed(2)}`}
+              color="primary"
+              variant="outlined"
+              sx={{ fontSize: "1rem", px: 1, py: 2.5 }}
+            />
+            <Badge
+              badgeContent={casesRemaining > 0 ? casesRemaining : null}
+              color="error"
+              max={9999}
+            >
+              <Chip
+                icon={<InventoryIcon />}
+                label={casesRemaining > 0 ? `${casesRemaining} case${casesRemaining !== 1 ? "s" : ""} ready to open` : "No cases — buy some below"}
+                color={casesRemaining > 0 ? "success" : "default"}
+                variant={casesRemaining > 0 ? "filled" : "outlined"}
+                sx={{ fontSize: "1rem", px: 1, py: 2.5 }}
+              />
+            </Badge>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
           {/* Spinner */}
-          {(spinning || showResult) && currentTarget && (
+          {(spinning || showResult) && targetItem && (
             <Box sx={{ mb: 4 }}>
               <CaseSpinner
                 items={items}
-                targetItem={currentTarget}
+                targetItem={targetItem}
                 spinning={spinning}
                 onComplete={handleSpinComplete}
               />
@@ -213,32 +227,90 @@ export default function OpenPage() {
                 <Button
                   variant="contained"
                   onClick={handleSpinAgain}
-                  disabled={!canSpinAgain}
+                  disabled={(user.cases_remaining ?? 0) < 1}
                 >
-                  {canSpinAgain ? `Spin Again (${wonItems.length - spinIndex - 1} left)` : "No cases left"}
+                  {(user.cases_remaining ?? 0) > 0
+                    ? `Spin Again (${user.cases_remaining} left)`
+                    : "No cases left"}
                 </Button>
               </Box>
             </Box>
           )}
 
-          {/* Open button */}
+          {/* Spin button — shown when not spinning and no result showing */}
           {!spinning && !showResult && (
-            <Box textAlign="center">
+            <Box textAlign="center" sx={{ mb: 5 }}>
               <Button
                 variant="contained"
                 size="large"
-                onClick={startOpenSession}
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={18} /> : null}
+                onClick={handleSpin}
+                disabled={casesRemaining < 1 || spinLoading}
                 sx={{ px: 6, py: 1.5, fontSize: "1.1rem" }}
               >
-                {loading ? "Opening..." : `Open x${selectedQty} Cases — $${cost}`}
+                {spinLoading
+                  ? "Opening..."
+                  : casesRemaining > 0
+                  ? `Open a Case (${casesRemaining} remaining)`
+                  : "Buy Cases Below to Spin"}
               </Button>
             </Box>
           )}
 
+          <Divider sx={{ mb: 4 }} />
+
+          {/* Buy cases section */}
+          <Typography variant="h6" fontWeight={700} gutterBottom textAlign="center">
+            Buy Cases
+          </Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 3 }}>
+            Cases are added to your account. Each spin uses 1 case and wins 1 item.
+          </Typography>
+
+          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+            {CASE_PRICES.map((preset) => (
+              <Card
+                key={preset.qty}
+                onClick={() => !buyLoading && setSelectedQty(preset.qty)}
+                sx={{
+                  cursor: buyLoading ? "not-allowed" : "pointer",
+                  border: selectedQty === preset.qty ? "2px solid #1976d2" : "2px solid transparent",
+                  boxShadow: selectedQty === preset.qty ? "0 0 12px #1976d244" : undefined,
+                  transition: "all 0.15s",
+                  minWidth: 120,
+                }}
+              >
+                <CardContent sx={{ textAlign: "center", py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                  <Typography variant="h5" fontWeight={700} color="primary.main">
+                    x{preset.qty}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                    ${preset.price}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    ${(preset.price / preset.qty).toFixed(4)}/case
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+
+          <Box textAlign="center" sx={{ mb: 6 }}>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<ShoppingCartIcon />}
+              onClick={handleBuyCases}
+              disabled={buyLoading}
+              sx={{ px: 5, py: 1.5 }}
+            >
+              {buyLoading
+                ? "Buying..."
+                : `Buy x${selectedQty} Cases — $${selectedPrice.price}`}
+            </Button>
+          </Box>
+
           {/* Item pool preview */}
-          <Divider sx={{ my: 4 }} />
+          <Divider sx={{ mb: 4 }} />
           <Typography variant="h6" fontWeight={700} gutterBottom>
             Items in Pool
           </Typography>
@@ -257,21 +329,21 @@ export default function OpenPage() {
         </>
       )}
 
-      {/* Buy more modal */}
+      {/* Insufficient balance modal */}
       <Dialog open={buyModalOpen} onClose={() => setBuyModalOpen(false)}>
         <DialogTitle>Insufficient Balance</DialogTitle>
         <DialogContent>
           <Typography>
-            You need ${cost} to open x{selectedQty} cases. Deposit more funds to continue.
+            You need ${selectedPrice.price} to buy x{selectedQty} cases. Deposit more funds to continue.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBuyModalOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            onClick={() => { setBuyModalOpen(false); }}
             component={NextLink}
             href="/?deposit=1"
+            onClick={() => setBuyModalOpen(false)}
           >
             Deposit
           </Button>

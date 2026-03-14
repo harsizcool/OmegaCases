@@ -8,6 +8,7 @@ export interface User {
   balance: number
   admin: boolean
   cases: number
+  cases_remaining: number
   created_at: string
 }
 
