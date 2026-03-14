@@ -10,6 +10,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 })
   }
 
+  if (Number(amount) < 3) {
+    return NextResponse.json({ error: "Minimum withdrawal is $3.00" }, { status: 400 })
+  }
+
   const FEE_RATE = 0.05
   const fee = Number(amount) * FEE_RATE
   const net = Number(amount) - fee
