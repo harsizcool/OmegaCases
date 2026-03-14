@@ -9,7 +9,6 @@ import {
 import LockIcon from "@mui/icons-material/Lock"
 import InventoryIcon from "@mui/icons-material/Inventory"
 import StorefrontIcon from "@mui/icons-material/Storefront"
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
 import { useAuth } from "@/lib/auth-context"
 import type { Item, Rarity, Listing } from "@/lib/types"
 import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
@@ -105,25 +104,6 @@ export default function HomePage() {
       </Box>
 
       <Container maxWidth="xl" sx={{ py: 6 }}>
-        {/* Stats row */}
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          {[
-            { icon: <InventoryIcon sx={{ fontSize: 36, color: "primary.main" }} />, label: "Items Available", value: items.length || "8+" },
-            { icon: <StorefrontIcon sx={{ fontSize: 36, color: "primary.main" }} />, label: "Active Listings", value: listings.length },
-            { icon: <EmojiEventsIcon sx={{ fontSize: 36, color: "#FFD700" }} />, label: "Rarity Tiers", value: "5" },
-          ].map((stat, i) => (
-            <Grid item xs={12} sm={4} key={i}>
-              <Card sx={{ textAlign: "center", py: 2 }}>
-                <CardContent>
-                  {stat.icon}
-                  <Typography variant="h4" fontWeight={700}>{stat.value}</Typography>
-                  <Typography color="text.secondary">{stat.label}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-
         {/* Featured items */}
         <Typography variant="h5" fontWeight={700} gutterBottom>
           Featured Items
