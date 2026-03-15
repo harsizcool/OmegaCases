@@ -65,38 +65,54 @@ export async function GET(request: Request) {
     }
   }
 
-  // Apply pagination (skip for unlimited requests like limit=10000)
+  // Apply pagination
   if (limit <= 1000) {
+    // Normal paginated response
     const from = page * limit
     query = query.range(from, from + limit - 1)
+
+    const { data, error, count } = await query
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    let listings = data || []
+    if (search) {
+      const s = search.toLowerCase()
+      listings = listings.filter((l: any) => l.items?.name?.toLowerCase().includes(s))
+    }
+    if (sellerSearch) {
+      const ss = sellerSearch.toLowerCase()
+      listings = listings.filter((l: any) => l.users?.username?.toLowerCase().includes(ss))
+    }
+    if (rarity) {
+      const rarityList = rarity.split(",").map((r) => r.trim()).filter(Boolean)
+      listings = listings.filter((l: any) => rarityList.includes(l.items?.rarity))
+    }
+
+    return NextResponse.json({ listings, total: count ?? 0, page, pageSize: limit })
   }
 
-  const { data, error, count } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // limit > 1000: internal bulk fetch — loop through all pages to bypass Supabase 1000-row cap
+  // Used by sell dialog to get all active listings for exclusion checking
+  let allListings: any[] = []
+  let offset = 0
+  const BATCH = 1000
+  // Remove count: exact for bulk fetch to avoid overhead — use plain select
+  const bulkQuery = db
+    .from("listings")
+    .select("*, items(*), users(id, username, profile_picture)")
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
 
-  let listings = data || []
-
-  // Client-side text filters (can't easily push to Supabase without full-text search)
-  if (search) {
-    const s = search.toLowerCase()
-    listings = listings.filter((l: any) => l.items?.name?.toLowerCase().includes(s))
-  }
-  if (sellerSearch) {
-    const ss = sellerSearch.toLowerCase()
-    listings = listings.filter((l: any) => l.users?.username?.toLowerCase().includes(ss))
-  }
-  // Filter out rows where rarity join returned null (Supabase returns all rows with null items if rarity filter doesn't match)
-  if (rarity) {
-    const rarityList = rarity.split(",").map((r) => r.trim()).filter(Boolean)
-    listings = listings.filter((l: any) => rarityList.includes(l.items?.rarity))
-  }
-
-  if (limit > 1000) {
-    // Legacy: return plain array for internal use
-    return NextResponse.json(listings)
+  while (true) {
+    const { data: batch, error } = await bulkQuery.range(offset, offset + BATCH - 1)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!batch || batch.length === 0) break
+    allListings = allListings.concat(batch)
+    if (batch.length < BATCH) break
+    offset += BATCH
   }
 
-  return NextResponse.json({ listings, total: count ?? 0, page, pageSize: limit })
+  return NextResponse.json(allListings)
 }
 
 export async function POST(request: Request) {
