@@ -2,17 +2,25 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import dynamic from "next/dynamic"
 import {
   Container, Box, Typography, Chip, CircularProgress, Alert,
   Grid, Card, Avatar, Button, Paper,
 } from "@mui/material"
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import type { Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import NextLink from "next/link"
 import StorefrontIcon from "@mui/icons-material/Storefront"
 import PeopleIcon from "@mui/icons-material/People"
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
+
+const LineChart = dynamic(() => import("recharts").then((m) => m.LineChart), { ssr: false })
+const Line = dynamic(() => import("recharts").then((m) => m.Line), { ssr: false })
+const XAxis = dynamic(() => import("recharts").then((m) => m.XAxis), { ssr: false })
+const YAxis = dynamic(() => import("recharts").then((m) => m.YAxis), { ssr: false })
+const Tooltip = dynamic(() => import("recharts").then((m) => m.Tooltip), { ssr: false })
+const ResponsiveContainer = dynamic(() => import("recharts").then((m) => m.ResponsiveContainer), { ssr: false })
+const CartesianGrid = dynamic(() => import("recharts").then((m) => m.CartesianGrid), { ssr: false })
 
 const RARITY_ODDS: Record<string, string> = {
   Common: "1 in 2",

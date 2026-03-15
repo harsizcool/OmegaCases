@@ -3,16 +3,25 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import NextLink from "next/link"
+import dynamic from "next/dynamic"
 import {
   Container, Box, Typography, Card, CardMedia, Chip, Button,
   CircularProgress, Alert, Divider, Avatar, Grid,
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
 import type { Listing, Sale, Rarity } from "@/lib/types"
+
+// Lazy-load Recharts to avoid Turbopack chunk-load errors on client navigation
+const LineChart = dynamic(() => import("recharts").then((m) => m.LineChart), { ssr: false })
+const Line = dynamic(() => import("recharts").then((m) => m.Line), { ssr: false })
+const XAxis = dynamic(() => import("recharts").then((m) => m.XAxis), { ssr: false })
+const YAxis = dynamic(() => import("recharts").then((m) => m.YAxis), { ssr: false })
+const Tooltip = dynamic(() => import("recharts").then((m) => m.Tooltip), { ssr: false })
+const ResponsiveContainer = dynamic(() => import("recharts").then((m) => m.ResponsiveContainer), { ssr: false })
+const CartesianGrid = dynamic(() => import("recharts").then((m) => m.CartesianGrid), { ssr: false })
 
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>()
