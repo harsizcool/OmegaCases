@@ -6,7 +6,7 @@ import {
   Chip, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider, Checkbox, FormControlLabel, Tooltip,
+  Avatar, ListItemText, Divider, Checkbox, FormControlLabel, Tooltip, Slider,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"

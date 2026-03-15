@@ -100,15 +100,32 @@ export default function TradePage() {
 
   const fetchMyInventory = async () => {
     if (!user) return
-    const res = await fetch(`/api/inventory/${user.id}`)
-    const data = await res.json()
-    setMyInventory(Array.isArray(data) ? data : [])
+    // Paginate through all pages since API now returns { items, total, pageSize }
+    let all: InventoryItem[] = []
+    let page = 0
+    while (true) {
+      const res = await fetch(`/api/inventory/${user.id}?page=${page}`)
+      const data = await res.json()
+      const batch = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
+      all = all.concat(batch)
+      if (batch.length < 1000) break
+      page++
+    }
+    setMyInventory(all)
   }
 
   const fetchTheirInventory = async (userId: string) => {
-    const res = await fetch(`/api/inventory/${userId}`)
-    const data = await res.json()
-    setTheirInventory(Array.isArray(data) ? data : [])
+    let all: InventoryItem[] = []
+    let page = 0
+    while (true) {
+      const res = await fetch(`/api/inventory/${userId}?page=${page}`)
+      const data = await res.json()
+      const batch = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
+      all = all.concat(batch)
+      if (batch.length < 1000) break
+      page++
+    }
+    setTheirInventory(all)
   }
 
   const fetchUsers = async () => {
