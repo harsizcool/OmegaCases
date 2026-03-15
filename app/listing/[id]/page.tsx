@@ -19,7 +19,7 @@ export default function ListingPage() {
   const router = useRouter()
   const { user, refreshUser } = useAuth()
 
-  const [listing, setListing] = useState<Listing | null>(null)
+  const [listing, setListing] = useState<Listing & { supply_count?: number } | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
@@ -192,6 +192,12 @@ export default function ListingPage() {
 
             <Divider sx={{ my: 1.5 }} />
 
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+              <Typography color="text.secondary">Active Supply</Typography>
+              <Typography fontWeight={600}>
+                {listing.supply_count ?? 0} listing{listing.supply_count !== 1 ? "s" : ""}
+              </Typography>
+            </Box>
             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
               <Typography color="text.secondary">Listing Price</Typography>
               <Typography fontWeight={700} color="primary.main" variant="h6">

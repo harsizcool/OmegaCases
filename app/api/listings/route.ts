@@ -13,10 +13,12 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")
   const sortBy = searchParams.get("sortBy") || "created_at"
   const sortDir = searchParams.get("sortDir") === "asc"
+  const excludeSeller = searchParams.get("excludeSeller")
+  const showSold = searchParams.get("showSold") === "true"
 
   const db = createClient()
 
-  // Single listing fetch for /listing/[id] page
+  // Single listing fetch for /listing/[id] page — includes supply count
   if (id) {
     const { data, error } = await db
       .from("listings")
@@ -24,17 +26,31 @@ export async function GET(request: Request) {
       .eq("id", id)
       .single()
     if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 })
-    return NextResponse.json(data)
+
+    // Count active supply for this item
+    const { count: supplyCount } = await db
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("item_id", data.item_id)
+      .eq("status", "active")
+
+    return NextResponse.json({ ...data, supply_count: supplyCount ?? 0 })
   }
 
   let query = db
     .from("listings")
     .select("*, items(*), users(id, username, profile_picture)")
-    .eq("status", "active")
     .order(sortBy === "price" ? "price" : "created_at", { ascending: sortDir })
+
+  if (showSold) {
+    query = query.in("status", ["active", "sold"])
+  } else {
+    query = query.eq("status", "active")
+  }
 
   if (minPrice) query = query.gte("price", parseFloat(minPrice))
   if (maxPrice) query = query.lte("price", parseFloat(maxPrice))
+  if (excludeSeller) query = query.neq("seller_id", excludeSeller)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
