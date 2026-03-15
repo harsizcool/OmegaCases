@@ -28,57 +28,37 @@ export async function POST(request: Request) {
     }
   }
 
-  const { payment_id, payment_status, price_amount, actually_paid, order_id } = body
+  const { payment_id, payment_status } = body
 
   if (!CONFIRMED_STATUSES.includes(payment_status)) {
     return NextResponse.json({ ok: true })
   }
 
+  if (!payment_id) {
+    console.error("[webhook] No payment_id in IPN body")
+    return NextResponse.json({ ok: true })
+  }
+
   const supabase = await createClient()
 
-  let deposit: any = null
+  // Look up deposit by payment_id — always cast to string since DB column is text
+  // but NOWPayments sends payment_id as a number in the IPN payload
+  const { data: deposit } = await supabase
+    .from("deposits")
+    .select("*")
+    .eq("payment_id", String(payment_id))
+    .maybeSingle()
 
-  // 1. Try by payment_id — cast to numeric for reliable matching
-  if (payment_id) {
-    const { data } = await supabase
-      .from("deposits")
-      .select("*")
-      .eq("payment_id", payment_id)
-      .maybeSingle()
-    deposit = data
+  if (!deposit) {
+    console.error("[webhook] No deposit found for payment_id:", payment_id)
+    return NextResponse.json({ ok: true })
+  }
+  if (deposit.status === "confirmed") {
+    return NextResponse.json({ ok: true })
   }
 
-  // 2. Fallback: try matching stored order_id directly
-  if (!deposit && typeof order_id === "string") {
-    const { data } = await supabase
-      .from("deposits")
-      .select("*")
-      .eq("order_id", order_id)
-      .maybeSingle()
-    deposit = data
-  }
-
-  // 3. Last resort: extract user_id from order_id format oc_{uuid}_{timestamp}
-  if (!deposit && typeof order_id === "string" && order_id.startsWith("oc_")) {
-    const parts = order_id.split("_")
-    // UUID contains hyphens — rejoin middle parts: parts[0]="oc", last=timestamp
-    const userId = parts.slice(1, -1).join("_")
-    const { data } = await supabase
-      .from("deposits")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    deposit = data
-  }
-
-  if (!deposit) return NextResponse.json({ ok: true })
-  if (deposit.status === "confirmed") return NextResponse.json({ ok: true })
-
-  // Credit the USD value that was actually paid
-  const creditAmount = Number(price_amount || deposit.amount_usd)
+  // Use the amount stored at deposit creation — never trust IPN for credit amount
+  const creditAmount = Number(deposit.amount_usd)
 
   const { data: userRow } = await supabase
     .from("users")
@@ -86,7 +66,10 @@ export async function POST(request: Request) {
     .eq("id", deposit.user_id)
     .single()
 
-  if (!userRow) return NextResponse.json({ ok: true })
+  if (!userRow) {
+    console.error("[webhook] No user found for user_id:", deposit.user_id)
+    return NextResponse.json({ ok: true })
+  }
 
   const newBalance = Number(userRow.balance) + creditAmount
 
@@ -97,9 +80,11 @@ export async function POST(request: Request) {
       .eq("id", deposit.user_id),
     supabase
       .from("deposits")
-      .update({ status: "confirmed", amount_usd: creditAmount })
+      .update({ status: "confirmed" })
       .eq("id", deposit.id),
   ])
+
+  console.log(`[webhook] Credited $${creditAmount} to user ${deposit.user_id}, new balance: $${newBalance}`)
 
   return NextResponse.json({ ok: true })
 }
