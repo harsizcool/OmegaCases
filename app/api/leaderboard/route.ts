@@ -12,14 +12,25 @@ export async function GET() {
 
   if (!users) return NextResponse.json([])
 
-  const { data: inventory } = await db
-    .from("inventory")
-    .select("user_id, items(rap)")
+  // Fetch ALL inventory rows across all users in pages to bypass Supabase's 1000-row default limit
+  let allInventory: { user_id: string; items: { rap: number } | null }[] = []
+  let from = 0
+  const pageSize = 1000
+  while (true) {
+    const { data: page, error } = await db
+      .from("inventory")
+      .select("user_id, items(rap)")
+      .range(from, from + pageSize - 1)
+    if (error || !page || page.length === 0) break
+    allInventory = allInventory.concat(page as any)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
 
   const rapMap: Record<string, number> = {}
   const countMap: Record<string, number> = {}
 
-  for (const inv of inventory || []) {
+  for (const inv of allInventory) {
     const uid = inv.user_id
     const rap = Number((inv.items as any)?.rap ?? 0)
     if (!rapMap[uid]) { rapMap[uid] = 0; countMap[uid] = 0 }
