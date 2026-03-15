@@ -49,12 +49,12 @@ export default function MarketplacePage() {
   const [page, setPage] = useState(0)
   const [totalListings, setTotalListings] = useState(0)
   const [search, setSearch] = useState("")
-  const [rarities, setRarities] = useState<string[]>(["Rare", "Legendary", "Omega"])
+  const [rarities, setRarities] = useState<string[]>([])
   const [minPrice, setMinPrice] = useState<string>("")
   const [maxPrice, setMaxPrice] = useState<string>("")
   const [sellerSearch, setSellerSearch] = useState("")
-  const [sortBy, setSortBy] = useState("created_at")
-  const [ignoreOwn, setIgnoreOwn] = useState(true)
+  const [sortBy, setSortBy] = useState("price")
+  const [ignoreOwn, setIgnoreOwn] = useState(false)
   const [showSold, setShowSold] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
@@ -74,7 +74,7 @@ export default function MarketplacePage() {
         if (saved.ignoreOwn != null) setIgnoreOwn(saved.ignoreOwn)
         if (saved.showSold != null) setShowSold(saved.showSold)
       }
-      // If no saved state, defaults (Rare+Legendary+Omega, ignoreOwn=true) already set above
+      // If no saved state, defaults (sort by price, no filters) already set above
     } catch {}
     setHydrated(true)
   }, [])
