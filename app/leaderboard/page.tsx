@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Container, Box, Typography, Card, CardContent, Avatar,
   CircularProgress, Chip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material"
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
-import NextLink from "next/link"
 
 interface LeaderboardEntry {
   id: string
@@ -20,6 +20,7 @@ interface LeaderboardEntry {
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     const load = async () => {
@@ -60,8 +61,7 @@ export default function LeaderboardPage() {
               {entries.map((entry, i) => (
                 <TableRow
                   key={entry.id}
-                  component={NextLink}
-                  href={`/user/${entry.username}`}
+                  onClick={() => router.push(`/user/${entry.username}`)}
                   sx={{
                     textDecoration: "none",
                     cursor: "pointer",

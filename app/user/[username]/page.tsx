@@ -236,41 +236,49 @@ export default function UserPage() {
                       "&:hover": { boxShadow: `0 4px 16px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
                     }}
                   >
-                    <CardMedia
-                      component="img"
-                      image={b.image_url}
-                      alt={b.name}
-                      sx={{ height: 110, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                    />
-                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                      <Chip
-                        label={b.rarity}
-                        size="small"
-                        sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
+                    <Box
+                      component={NextLink}
+                      href={`/item/${encodeURIComponent(b.name)}`}
+                      sx={{ display: "block", textDecoration: "none", color: "inherit" }}
+                    >
+                      <CardMedia
+                        component="img"
+                        image={b.image_url}
+                        alt={b.name}
+                        sx={{ height: 110, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
                       />
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        fontWeight={600}
-                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      >
-                        {b.name}
-                      </Typography>
-                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
-                        RAP: ${b.rap.toFixed(2)}
-                      </Typography>
-                    {isMe && !bundle && (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        fullWidth
-                        sx={{ mt: 0.5, fontSize: "0.65rem" }}
-                        onClick={() => openListDialog(b.inventoryId, { name: b.name, market_price: b.market_price })}
-                      >
-                        Sell
-                      </Button>
+                      <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                        <Chip
+                          label={b.rarity}
+                          size="small"
+                          sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
+                        />
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          fontWeight={600}
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {b.name}
+                        </Typography>
+                        <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
+                          RAP: ${b.rap.toFixed(2)}
+                        </Typography>
+                      </CardContent>
+                    </Box>
+                    {isMe && (
+                      <Box sx={{ px: 1, pb: 1 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          fullWidth
+                          sx={{ fontSize: "0.65rem" }}
+                          onClick={() => openListDialog(b.inventoryId, { name: b.name, market_price: b.market_price })}
+                        >
+                          Sell
+                        </Button>
+                      </Box>
                     )}
-                    </CardContent>
                   </Card>
                 </Badge>
               </Grid>
@@ -292,41 +300,49 @@ export default function UserPage() {
                     "&:hover": { boxShadow: `0 4px 16px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
                   }}
                 >
-                  <CardMedia
-                    component="img"
-                    image={item.image_url}
-                    alt={item.name}
-                    sx={{ height: 110, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                  />
-                  <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                    <Chip
-                      label={item.rarity}
-                      size="small"
-                      sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
+                  <Box
+                    component={NextLink}
+                    href={`/item/${encodeURIComponent(item.name)}`}
+                    sx={{ display: "block", textDecoration: "none", color: "inherit" }}
+                  >
+                    <CardMedia
+                      component="img"
+                      image={item.image_url}
+                      alt={item.name}
+                      sx={{ height: 110, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
                     />
-                    <Typography
-                      variant="caption"
-                      display="block"
-                      fontWeight={600}
-                      sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                    >
-                      {item.name}
-                    </Typography>
-                    <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
-                      RAP: ${Number(item.rap).toFixed(2)}
-                    </Typography>
-                    {isMe && (
+                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                      <Chip
+                        label={item.rarity}
+                        size="small"
+                        sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
+                      />
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        fontWeight={600}
+                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
+                        {item.name}
+                      </Typography>
+                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
+                        RAP: ${Number(item.rap).toFixed(2)}
+                      </Typography>
+                    </CardContent>
+                  </Box>
+                  {isMe && (
+                    <Box sx={{ px: 1, pb: 1 }}>
                       <Button
                         variant="outlined"
                         size="small"
                         fullWidth
-                        sx={{ mt: 0.5, fontSize: "0.65rem" }}
+                        sx={{ fontSize: "0.65rem" }}
                         onClick={() => openListDialog(inv.id, { name: item.name, market_price: Number(item.market_price) })}
                       >
                         Sell
                       </Button>
-                    )}
-                  </CardContent>
+                    </Box>
+                  )}
                 </Card>
               </Grid>
             )

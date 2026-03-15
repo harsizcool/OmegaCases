@@ -12,6 +12,13 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import { useAuth } from "@/lib/auth-context"
 import { ACCEPTED_CRYPTOS } from "@/lib/types"
 
+const CRYPTO_LOGOS: Record<string, string> = {
+  BTC: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bitcoinbtclogo-gR5sveMSBdogiczfVIttQA0i3st3rw.png",
+  LTC: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/litecoin-ltc-logo-QSr9ZvLxuAcx08rGnib7e7qZY0Fhao.png",
+  SOL: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/solana-sol-logo-q7oh1kxhGFGclcD4nTk1O1TOTuHGu3.png",
+  BCH: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bitcoin-cash-bch-logo-sF2o6xhMfMM99h9vcF0EKoFRcbBlqI.png",
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -151,8 +158,9 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                 label="Cryptocurrency"
               >
                 {ACCEPTED_CRYPTOS.map((c) => (
-                  <MenuItem key={c} value={c}>
-                    {c}
+                  <MenuItem key={c} value={c} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box component="img" src={CRYPTO_LOGOS[c]} alt={c} sx={{ width: 24, height: 24, objectFit: "contain" }} />
+                    <Typography variant="body2" fontWeight={600}>{c}</Typography>
                   </MenuItem>
                 ))}
               </Select>
@@ -216,8 +224,9 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                 label="Cryptocurrency"
               >
                 {ACCEPTED_CRYPTOS.map((c) => (
-                  <MenuItem key={c} value={c}>
-                    {c}
+                  <MenuItem key={c} value={c} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box component="img" src={CRYPTO_LOGOS[c]} alt={c} sx={{ width: 24, height: 24, objectFit: "contain" }} />
+                    <Typography variant="body2" fontWeight={600}>{c}</Typography>
                   </MenuItem>
                 ))}
               </Select>
