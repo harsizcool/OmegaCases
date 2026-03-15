@@ -10,6 +10,8 @@ import {
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"
 import OpenInNewIcon from "@mui/icons-material/OpenInNew"
+import FormControlLabel from "@mui/material/FormControlLabel"
+import Checkbox from "@mui/material/Checkbox"
 import { useAuth } from "@/lib/auth-context"
 import type { Listing, Rarity, InventoryItem } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
@@ -21,7 +23,8 @@ const MAX_LISTING_PRICE = 800
 
 // Extracted as a stable top-level component to prevent remounting on parent re-render
 function FilterPanel({
-  search, setSearch, rarity, setRarity, priceRange, setPriceRange, sortBy, setSortBy, onApply,
+  search, setSearch, rarity, setRarity, priceRange, setPriceRange, sortBy, setSortBy,
+  ignoreOwn, setIgnoreOwn, showSold, setShowSold, onApply,
 }: {
   search: string
   setSearch: (v: string) => void
@@ -31,6 +34,10 @@ function FilterPanel({
   setPriceRange: (v: [number, number]) => void
   sortBy: string
   setSortBy: (v: string) => void
+  ignoreOwn: boolean
+  setIgnoreOwn: (v: boolean) => void
+  showSold: boolean
+  setShowSold: (v: boolean) => void
   onApply: () => void
 }) {
   return (
@@ -78,6 +85,16 @@ function FilterPanel({
             <MenuItem value="price">Price</MenuItem>
           </Select>
         </FormControl>
+        <FormControlLabel
+          control={<Checkbox checked={ignoreOwn} onChange={(e) => setIgnoreOwn(e.target.checked)} size="small" />}
+          label={<Typography variant="body2">Ignore Your Listings</Typography>}
+          sx={{ mb: 0.5, display: "block" }}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={showSold} onChange={(e) => setShowSold(e.target.checked)} size="small" />}
+          label={<Typography variant="body2">Show Sold Items</Typography>}
+          sx={{ mb: 1.5, display: "block" }}
+        />
         <Button variant="outlined" fullWidth onClick={onApply}>
           Apply
         </Button>
@@ -96,6 +113,8 @@ export default function MarketplacePage() {
   const [rarity, setRarity] = useState("")
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 800])
   const [sortBy, setSortBy] = useState("created_at")
+  const [ignoreOwn, setIgnoreOwn] = useState(false)
+  const [showSold, setShowSold] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
 
   // Sell dialog
@@ -114,12 +133,14 @@ export default function MarketplacePage() {
     if (priceRange[0] > 0) params.set("minPrice", String(priceRange[0]))
     if (priceRange[1] < 800) params.set("maxPrice", String(priceRange[1]))
     if (search) params.set("search", search)
+    if (ignoreOwn && user?.id) params.set("excludeSeller", user.id)
+    if (showSold) params.set("showSold", "true")
     params.set("sortBy", sortBy)
     const res = await fetch(`/api/listings?${params}`)
     const data = await res.json()
     setListings(Array.isArray(data) ? data : [])
     setLoading(false)
-  }, [rarity, priceRange, sortBy, search])
+  }, [rarity, priceRange, sortBy, search, ignoreOwn, showSold, user?.id])
 
   // Debounce on search; instant on filter changes
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -185,6 +206,8 @@ export default function MarketplacePage() {
     rarity, setRarity,
     priceRange, setPriceRange,
     sortBy, setSortBy,
+    ignoreOwn, setIgnoreOwn,
+    showSold, setShowSold,
     onApply: fetchListings,
   }
 
@@ -264,8 +287,8 @@ export default function MarketplacePage() {
                         >
                           {item.name}
                         </Typography>
-                        <Typography variant="body2" fontWeight={700} color="primary.main">
-                          ${Number(listing.price).toFixed(2)}
+                        <Typography variant="body2" fontWeight={700} color={listing.status === "sold" ? "text.disabled" : "primary.main"}>
+                          ${Number(listing.price).toFixed(2)}{listing.status === "sold" && <Chip label="SOLD" size="small" sx={{ ml: 0.5, fontSize: "0.55rem", height: 16 }} color="default" />}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" display="block">
                           by {listing.users?.username || "—"}
