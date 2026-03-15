@@ -259,17 +259,17 @@ export default function UserPage() {
                       <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
                         RAP: ${b.rap.toFixed(2)}
                       </Typography>
-                      {isMe && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          fullWidth
-                          sx={{ mt: 0.5, fontSize: "0.65rem" }}
-                          onClick={() => openListDialog(b.inventoryId, { name: b.name, market_price: b.market_price })}
-                        >
-                          Sell
-                        </Button>
-                      )}
+                    {isMe && !bundle && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        sx={{ mt: 0.5, fontSize: "0.65rem" }}
+                        onClick={() => openListDialog(b.inventoryId, { name: b.name, market_price: b.market_price })}
+                      >
+                        Sell
+                      </Button>
+                    )}
                     </CardContent>
                   </Card>
                 </Badge>

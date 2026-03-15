@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
   Container, Box, Typography, TextField, InputAdornment,
@@ -27,6 +27,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResults>({ items: [], users: [], listings: [] })
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState(0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const doSearch = useCallback(async (q: string) => {
     setLoading(true)
@@ -40,10 +41,21 @@ export default function SearchPage() {
     doSearch(initialQuery)
   }, [initialQuery, doSearch])
 
+  const handleChange = (val: string) => {
+    setInputValue(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      router.replace(val.trim() ? `/search?query=${encodeURIComponent(val.trim())}` : "/search", { scroll: false })
+      doSearch(val.trim())
+    }, 300)
+  }
+
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
       const q = inputValue.trim()
       router.push(q ? `/search?query=${encodeURIComponent(q)}` : "/search")
+      doSearch(q)
     }
   }
 
@@ -60,7 +72,7 @@ export default function SearchPage() {
           fullWidth
           placeholder="Search items, users, listings..."
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKey}
           InputProps={{
             startAdornment: (

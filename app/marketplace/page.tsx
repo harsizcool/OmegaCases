@@ -6,7 +6,7 @@ import {
   Chip, Slider, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider,
+  Avatar, ListItemText, Divider, Checkbox, FormControlLabel as MuiFormControlLabel,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"
@@ -123,6 +123,9 @@ export default function MarketplacePage() {
   // Step 1: show unique items; Step 2: show copies of selected unique item
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [sellItem, setSellItem] = useState<InventoryItem | null>(null)
+  const [selectedCopies, setSelectedCopies] = useState<InventoryItem[]>([])
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkPriceRange, setBulkPriceRange] = useState<[number, number]>([0.01, 0.04])
   const [sellPrice, setSellPrice] = useState("")
   const [sellLoading, setSellLoading] = useState(false)
   const [sellError, setSellError] = useState("")
@@ -173,27 +176,45 @@ export default function MarketplacePage() {
     setSellError("")
     setSellSuccess(false)
     setSelectedItemId(null)
+    setSelectedCopies([])
+    setBulkMode(false)
     fetchMyInventory()
     setSellOpen(true)
   }
 
   const handleSell = async () => {
-    if (!sellItem || !sellPrice || !user) return
-    const price = parseFloat(sellPrice)
-    const rarity = sellItem.items?.rarity ?? "Omega"
-    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
-    if (price > cap) { setSellError(`Max price for ${rarity} is $${cap.toFixed(2)}`); return }
-    if (price <= 0) { setSellError("Price must be greater than $0"); return }
+    if (!user) return
     setSellLoading(true)
     setSellError("")
     try {
-      const res = await fetch("/api/listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seller_id: user.id, inventory_id: sellItem.id, item_id: sellItem.item_id, price }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (bulkMode && selectedCopies.length > 1) {
+        // Bulk list: random price in range for each copy
+        const [minP, maxP] = bulkPriceRange
+        const results = await Promise.all(selectedCopies.map((inv) => {
+          const randomPrice = Math.round((minP + Math.random() * (maxP - minP)) * 100) / 100
+          return fetch("/api/listings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ seller_id: user.id, inventory_id: inv.id, item_id: inv.item_id, price: randomPrice }),
+          })
+        }))
+        const failed = results.filter((r) => !r.ok).length
+        if (failed > 0) throw new Error(`${failed} listing(s) failed`)
+      } else {
+        if (!sellItem || !sellPrice) return
+        const price = parseFloat(sellPrice)
+        const rarity = sellItem.items?.rarity ?? "Omega"
+        const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+        if (price > cap) { setSellError(`Max price for ${rarity} is $${cap.toFixed(2)}`); setSellLoading(false); return }
+        if (price <= 0) { setSellError("Price must be greater than $0"); setSellLoading(false); return }
+        const res = await fetch("/api/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seller_id: user.id, inventory_id: sellItem.id, item_id: sellItem.item_id, price }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+      }
       setSellSuccess(true)
       fetchListings()
     } catch (e: any) {
@@ -302,7 +323,9 @@ export default function MarketplacePage() {
       <Dialog open={sellOpen} onClose={() => setSellOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {selectedItemId && !sellSuccess && (
-            <Button size="small" startIcon={<ArrowBackIcon />} onClick={() => { setSelectedItemId(null); setSellItem(null); setSellPrice("") }} sx={{ mr: 1 }}>
+            <Button size="small" startIcon={<ArrowBackIcon />}
+              onClick={() => { setSelectedItemId(null); setSellItem(null); setSellPrice(""); setSelectedCopies([]); setBulkMode(false) }}
+              sx={{ mr: 1 }}>
               Back
             </Button>
           )}
@@ -346,19 +369,59 @@ export default function MarketplacePage() {
           ) : (
             // Step 2: copies + price input
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-              {selectedGroup && selectedGroup.copies.length > 1 && !sellItem && (
+              {selectedGroup && selectedGroup.copies.length > 1 && (
                 <>
-                  <Typography variant="body2" color="text.secondary">You own {selectedGroup.copies.length} copies. Pick one:</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    You own <strong>{selectedGroup.copies.length}</strong> copies. Select which to list:
+                  </Typography>
                   <List dense disablePadding>
-                    {selectedGroup.copies.map((inv, idx) => (
-                      <Box key={inv.id}>
-                        {idx > 0 && <Divider />}
-                        <ListItemButton onClick={() => { setSellItem(inv); setSellPrice(String(selectedGroup.market_price)) }} sx={{ borderRadius: 1 }}>
-                          <ListItemText primary={`Copy #${idx + 1}`} secondary={`ID: ${inv.id.slice(0, 8)}…`} />
-                        </ListItemButton>
-                      </Box>
-                    ))}
+                    {selectedGroup.copies.map((inv, idx) => {
+                      const checked = selectedCopies.some((c) => c.id === inv.id)
+                      return (
+                        <Box key={inv.id}>
+                          {idx > 0 && <Divider />}
+                          <ListItemButton
+                            onClick={() => {
+                              setSelectedCopies((prev) =>
+                                checked ? prev.filter((c) => c.id !== inv.id) : [...prev, inv]
+                              )
+                              if (!checked && selectedCopies.length === 0) setSellItem(inv)
+                            }}
+                            sx={{ borderRadius: 1 }}
+                          >
+                            <Checkbox checked={checked} size="small" sx={{ mr: 1, p: 0 }} />
+                            <ListItemText primary={`Copy #${idx + 1}`} secondary={`ID: ${inv.id.slice(0, 8)}…`} />
+                          </ListItemButton>
+                        </Box>
+                      )
+                    })}
                   </List>
+                  {selectedCopies.length > 0 && (
+                    <MuiFormControlLabel
+                      control={<Checkbox checked={bulkMode} onChange={(e) => { setBulkMode(e.target.checked); setSellItem(selectedCopies[0] ?? null) }} size="small" />}
+                      label={<Typography variant="body2">Bulk list with random prices</Typography>}
+                    />
+                  )}
+                  {bulkMode && selectedCopies.length > 1 && (() => {
+                    const rarity = selectedGroup.rarity
+                    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+                    return (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Random price range: ${bulkPriceRange[0].toFixed(2)} – ${bulkPriceRange[1].toFixed(2)} (max ${cap.toFixed(2)} for {rarity})
+                        </Typography>
+                        <Slider
+                          value={bulkPriceRange}
+                          onChange={(_, v) => setBulkPriceRange(v as [number, number])}
+                          min={0.01} max={cap} step={0.01}
+                          sx={{ mt: 1 }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          Will list <strong>{selectedCopies.length}</strong> copies at randomized prices in this range.
+                        </Typography>
+                      </Box>
+                    )
+                  })()}
                 </>
               )}
               {/* Auto-select if only one copy */}
@@ -367,34 +430,42 @@ export default function MarketplacePage() {
                 if (!sellItem) { setSellItem(only); setSellPrice(String(selectedGroup.market_price)) }
                 return null
               })()}
-              {sellItem && (
-                <>
-                  {(() => {
-                    const rarity = sellItem.items?.rarity ?? "Omega"
-                    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
-                    return (
-                      <TextField
-                        label={`Your Price (USD, max $${cap.toFixed(2)} for ${rarity})`}
-                        type="number"
-                        value={sellPrice}
-                        onChange={(e) => setSellPrice(e.target.value)}
-                        inputProps={{ min: 0.01, max: cap, step: 0.01 }}
-                        fullWidth
-                        autoFocus
-                      />
-                    )
-                  })()}
-                  {sellError && <Alert severity="error">{sellError}</Alert>}
-                </>
-              )}
+              {/* Single item price input */}
+              {!bulkMode && (sellItem || (selectedCopies.length === 1)) && (() => {
+                const item = sellItem || selectedCopies[0]
+                if (!item) return null
+                if (!sellItem) setSellItem(item)
+                const rarity = item.items?.rarity ?? "Omega"
+                const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+                return (
+                  <TextField
+                    label={`Your Price (USD, max $${cap.toFixed(2)} for ${rarity})`}
+                    type="number"
+                    value={sellPrice}
+                    onChange={(e) => setSellPrice(e.target.value)}
+                    inputProps={{ min: 0.01, max: cap, step: 0.01 }}
+                    fullWidth
+                    autoFocus
+                  />
+                )
+              })()}
+              {sellError && <Alert severity="error">{sellError}</Alert>}
             </Box>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSellOpen(false)}>Close</Button>
-          {sellItem && !sellSuccess && (
-            <Button variant="contained" onClick={handleSell} disabled={sellLoading || !sellPrice}>
-              {sellLoading ? "Listing..." : "List"}
+          {(sellItem || (bulkMode && selectedCopies.length > 1)) && !sellSuccess && (
+            <Button
+              variant="contained"
+              onClick={handleSell}
+              disabled={sellLoading || (!bulkMode && !sellPrice)}
+            >
+              {sellLoading
+                ? "Listing..."
+                : bulkMode && selectedCopies.length > 1
+                  ? `Bulk List ${selectedCopies.length} Items`
+                  : "List"}
             </Button>
           )}
         </DialogActions>

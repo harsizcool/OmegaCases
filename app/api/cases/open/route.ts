@@ -56,6 +56,13 @@ export async function POST(request: Request) {
 
   if (invError) return NextResponse.json({ error: invError.message }, { status: 500 })
 
+  // Set first_unboxed_by if this item has never been unboxed before
+  await supabase
+    .from("items")
+    .update({ first_unboxed_by: user_id })
+    .eq("id", wonItemId)
+    .is("first_unboxed_by", null)
+
   // Return won item details
   const { data: wonItem } = await supabase
     .from("items")
