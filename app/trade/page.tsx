@@ -38,7 +38,9 @@ function ItemSlots({
   const [search, setSearch] = useState("")
   const [rarityFilter, setRarityFilter] = useState<string>("")
 
-  const available = inventory.filter((inv) => !items.find((i) => i.id === inv.id))
+  // Deduplicate inventory by row ID to prevent duplicate key warnings
+  const uniqueInventory = inventory.filter((inv, idx, arr) => arr.findIndex((x) => x.id === inv.id) === idx)
+  const available = uniqueInventory.filter((inv) => !items.find((i) => i.id === inv.id))
   const filtered = available.filter((inv) => {
     const matchSearch = !search || inv.items?.name.toLowerCase().includes(search.toLowerCase())
     const matchRarity = !rarityFilter || inv.items?.rarity === rarityFilter
