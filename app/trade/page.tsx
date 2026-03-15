@@ -264,9 +264,9 @@ export default function TradePage() {
 
         {/* Selected slots */}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1, minHeight: 56 }}>
-          {items.map((ti) => (
+          {items.map((ti, idx) => (
             <Badge
-              key={ti.id}
+              key={`${ti.id}-${idx}`}
               badgeContent={
                 <IconButton
                   size="small"
@@ -453,8 +453,8 @@ export default function TradePage() {
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {leftItems.map((ti) => (
-                  <Tooltip key={ti.id} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
+                {leftItems.map((ti, idx) => (
+                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
                     <Box
                       component="img"
                       src={ti.inventory.items.image_url}
@@ -491,8 +491,8 @@ export default function TradePage() {
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {rightItems.map((ti) => (
-                  <Tooltip key={ti.id} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
+                {rightItems.map((ti, idx) => (
+                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
                     <Box
                       component="img"
                       src={ti.inventory.items.image_url}
