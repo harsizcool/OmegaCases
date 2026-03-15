@@ -7,7 +7,7 @@ import dynamic from "next/dynamic"
 import {
   Container, Box, Typography, Button, Card, CardMedia, CardContent,
   Chip, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Divider, Tooltip,
+  DialogActions, TextField, Divider, Tooltip, Grid, Avatar,
 } from "@mui/material"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
