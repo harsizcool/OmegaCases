@@ -6,7 +6,7 @@ import {
   Chip, Slider, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider, Checkbox, FormControlLabel as MuiFormControlLabel,
+  Avatar, ListItemText, Divider, Checkbox, FormControlLabel,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"
@@ -395,7 +395,7 @@ export default function MarketplacePage() {
                     })}
                   </List>
                   {selectedCopies.length > 0 && (
-                    <MuiFormControlLabel
+                    <FormControlLabel
                       control={<Checkbox checked={bulkMode} onChange={(e) => { setBulkMode(e.target.checked); setSellItem(selectedCopies[0] ?? null) }} size="small" />}
                       label={<Typography variant="body2">Bulk list with random prices</Typography>}
                     />
