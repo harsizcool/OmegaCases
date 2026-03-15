@@ -30,6 +30,7 @@ export default function ItemPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [tab, setTab] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -52,7 +53,6 @@ export default function ItemPage() {
   const salesAvg = sales.length ? (sales.reduce((s: number, x: any) => s + Number(x.price), 0) / sales.length) : 0
 
   const tabs = ["Stats", "Sales Chart", "Listings", "Owners"]
-  const [tab, setTab] = useState(0)
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
