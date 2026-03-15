@@ -212,7 +212,6 @@ export default function TradePage() {
     }
   }
 
-  // Item slots with search
   const ItemSlots = ({
     items,
     inventory,
@@ -227,10 +226,15 @@ export default function TradePage() {
     label: string
   }) => {
     const [search, setSearch] = useState("")
+    const [rarityFilter, setRarityFilter] = useState<string>("")
+    const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
+
     const available = inventory.filter((inv) => !items.find((i) => i.id === inv.id))
-    const filtered = available.filter((inv) =>
-      !search || inv.items?.name.toLowerCase().includes(search.toLowerCase())
-    )
+    const filtered = available.filter((inv) => {
+      const matchSearch = !search || inv.items?.name.toLowerCase().includes(search.toLowerCase())
+      const matchRarity = !rarityFilter || inv.items?.rarity === rarityFilter
+      return matchSearch && matchRarity
+    })
 
     return (
       <Box>
@@ -285,7 +289,7 @@ export default function TradePage() {
           )}
         </Box>
 
-        {/* Search + available items */}
+        {/* Search + rarity filter + available items */}
         {items.length < MAX_ITEMS && available.length > 0 && (
           <>
             <TextField
@@ -294,7 +298,7 @@ export default function TradePage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               fullWidth
-              sx={{ mb: 1 }}
+              sx={{ mb: 0.75 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -303,6 +307,31 @@ export default function TradePage() {
                 ),
               }}
             />
+            {/* Rarity filter chips */}
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1 }}>
+              <Chip
+                label="All"
+                size="small"
+                onClick={() => setRarityFilter("")}
+                variant={rarityFilter === "" ? "filled" : "outlined"}
+                sx={{ fontSize: "0.65rem", height: 20, cursor: "pointer" }}
+              />
+              {RARITIES.map((r) => (
+                <Chip
+                  key={r}
+                  label={r}
+                  size="small"
+                  onClick={() => setRarityFilter(rarityFilter === r ? "" : r)}
+                  variant={rarityFilter === r ? "filled" : "outlined"}
+                  sx={{
+                    fontSize: "0.65rem", height: 20, cursor: "pointer",
+                    bgcolor: rarityFilter === r ? RARITY_COLORS[r as Rarity] : undefined,
+                    color: rarityFilter === r ? "#fff" : RARITY_COLORS[r as Rarity],
+                    borderColor: RARITY_COLORS[r as Rarity],
+                  }}
+                />
+              ))}
+            </Box>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxHeight: 130, overflowY: "auto" }}>
               {filtered.map((inv) => (
                 <Tooltip
