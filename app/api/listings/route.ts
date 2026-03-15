@@ -7,10 +7,11 @@ const MAX_LISTING_PRICE = 800
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
-  const rarity = searchParams.get("rarity")
+  const rarity = searchParams.get("rarity")  // comma-separated or single
   const minPrice = searchParams.get("minPrice")
   const maxPrice = searchParams.get("maxPrice")
   const search = searchParams.get("search")
+  const sellerSearch = searchParams.get("sellerSearch")
   const sortBy = searchParams.get("sortBy") || "created_at"
   const sortDir = searchParams.get("sortDir") === "asc"
   const excludeSeller = searchParams.get("excludeSeller")
@@ -54,10 +55,20 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   let listings = data || []
-  if (rarity) listings = listings.filter((l: any) => l.items?.rarity === rarity)
+  // Multi-rarity filter (comma-separated)
+  if (rarity) {
+    const rarityList = rarity.split(",").map((r) => r.trim()).filter(Boolean)
+    if (rarityList.length > 0) {
+      listings = listings.filter((l: any) => rarityList.includes(l.items?.rarity))
+    }
+  }
   if (search) {
     const s = search.toLowerCase()
     listings = listings.filter((l: any) => l.items?.name?.toLowerCase().includes(s))
+  }
+  if (sellerSearch) {
+    const ss = sellerSearch.toLowerCase()
+    listings = listings.filter((l: any) => l.users?.username?.toLowerCase().includes(ss))
   }
 
   return NextResponse.json(listings)

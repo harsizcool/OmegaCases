@@ -178,6 +178,9 @@ export default function UserPage() {
             {bundle && bundledItems.length !== inventory.length && (
               <> &middot; {bundledItems.length} unique</>
             )}
+            {profile?.cases > 0 && (
+              <> &middot; <strong>{Number(profile.cases).toLocaleString()}</strong> total case{profile.cases !== 1 ? "s" : ""} opened</>
+            )}
           </Typography>
         </Box>
         {isMe && (

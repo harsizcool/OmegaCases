@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Tabs, Tab, Box, Typography,
@@ -9,8 +10,12 @@ import {
 } from "@mui/material"
 import Link from "next/link"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
+import QrCode2Icon from "@mui/icons-material/QrCode2"
 import { useAuth } from "@/lib/auth-context"
 import { ACCEPTED_CRYPTOS } from "@/lib/types"
+
+// Lazy-load QR code to avoid SSR issues
+const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), { ssr: false })
 
 const CRYPTO_LOGOS: Record<string, string> = {
   BTC: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bitcoinbtclogo-gR5sveMSBdogiczfVIttQA0i3st3rw.png",
@@ -186,8 +191,25 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                     Copy
                   </Button>
                 </Box>
+                {/* QR Code */}
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mt: 2, mb: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                    <QrCode2Icon fontSize="small" color="primary" />
+                    <Typography variant="caption" fontWeight={600} color="primary.main">
+                      Scan to pay
+                    </Typography>
+                  </Box>
+                  <Box sx={{ bgcolor: "#fff", p: 1.5, borderRadius: 2, border: "1px solid #90caf9", display: "inline-block" }}>
+                    <QRCodeSVG
+                      value={depositResult.pay_address}
+                      size={160}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  </Box>
+                </Box>
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  Balance will be credited automatically once confirmed.
+                  Balance will be credited automatically once confirmed on-chain.
                 </Alert>
               </Box>
             )}

@@ -71,11 +71,19 @@ export async function POST(
       price: listing.price,
     })
 
-  // Update item market_price
-  await supabase
-    .from("items")
-    .update({ market_price: listing.price })
-    .eq("id", listing.item_id)
+  // Update item market_price to AVERAGE of all sales (RAP = avg sale price)
+  const { data: salesData } = await supabase
+    .from("sales")
+    .select("price")
+    .eq("item_id", listing.item_id)
+
+  if (salesData && salesData.length > 0) {
+    const avgPrice = salesData.reduce((sum, s) => sum + Number(s.price), 0) / salesData.length
+    await supabase
+      .from("items")
+      .update({ market_price: Math.round(avgPrice * 100) / 100 })
+      .eq("id", listing.item_id)
+  }
 
   return NextResponse.json({ success: true })
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Container, Grid, Box, Typography, Card, CardContent, CardMedia,
-  Chip, Slider, TextField, Select, MenuItem, FormControl, InputLabel,
+  Chip, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
   Avatar, ListItemText, Divider, Checkbox, FormControlLabel,
@@ -39,39 +39,72 @@ function saveFilters(f: object) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(f))
 }
 
-// Stable top-level component — never re-created between parent renders
+// --- FilterPanel: multi-rarity, seller search, typed price range ---
 function FilterPanel({
-  search, setSearch, rarity, setRarity, priceRange, setPriceRange, sortBy, setSortBy,
-  ignoreOwn, setIgnoreOwn, showSold, setShowSold, onApply,
+  search, setSearch,
+  rarities, setRarities,
+  minPrice, setMinPrice,
+  maxPrice, setMaxPrice,
+  sellerSearch, setSellerSearch,
+  sortBy, setSortBy,
+  ignoreOwn, setIgnoreOwn,
+  showSold, setShowSold,
+  onApply,
 }: {
   search: string; setSearch: (v: string) => void
-  rarity: string; setRarity: (v: string) => void
-  priceRange: [number, number]; setPriceRange: (v: [number, number]) => void
+  rarities: string[]; setRarities: (v: string[]) => void
+  minPrice: string; setMinPrice: (v: string) => void
+  maxPrice: string; setMaxPrice: (v: string) => void
+  sellerSearch: string; setSellerSearch: (v: string) => void
   sortBy: string; setSortBy: (v: string) => void
   ignoreOwn: boolean; setIgnoreOwn: (v: boolean) => void
   showSold: boolean; setShowSold: (v: boolean) => void
   onApply: () => void
 }) {
+  const toggleRarity = (r: string) => {
+    setRarities(rarities.includes(r) ? rarities.filter((x) => x !== r) : [...rarities, r])
+  }
   return (
     <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
       <Card sx={{ p: 2, position: { md: "sticky" }, top: { md: 80 } }}>
         <Typography variant="subtitle1" fontWeight={700} gutterBottom>Filters</Typography>
-        <TextField label="Search" value={search} onChange={(e) => setSearch(e.target.value)}
+        <TextField label="Search item name" value={search} onChange={(e) => setSearch(e.target.value)}
           fullWidth size="small" sx={{ mb: 2 }} autoComplete="off" />
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Rarity</InputLabel>
-          <Select value={rarity} onChange={(e) => setRarity(e.target.value)} label="Rarity">
-            <MenuItem value="">All</MenuItem>
-            {RARITIES.map((r) => (
-              <MenuItem key={r} value={r}>
-                <Chip label={r} size="small" sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", mr: 1 }} />{r}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Typography variant="caption" color="text.secondary">Price: ${priceRange[0]} – ${priceRange[1]}</Typography>
-        <Slider value={priceRange} onChange={(_, v) => setPriceRange(v as [number, number])}
-          min={0} max={800} step={1} sx={{ mt: 1, mb: 2 }} />
+        <TextField label="Seller username" value={sellerSearch} onChange={(e) => setSellerSearch(e.target.value)}
+          fullWidth size="small" sx={{ mb: 2 }} autoComplete="off" />
+
+        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+          Rarity
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
+          {RARITIES.map((r) => (
+            <Chip
+              key={r}
+              label={r}
+              size="small"
+              onClick={() => toggleRarity(r)}
+              sx={{
+                bgcolor: rarities.includes(r) ? RARITY_COLORS[r as Rarity] : "transparent",
+                color: rarities.includes(r) ? "#fff" : "text.secondary",
+                border: `1px solid ${RARITY_COLORS[r as Rarity]}`,
+                cursor: "pointer",
+                fontWeight: rarities.includes(r) ? 700 : 400,
+              }}
+            />
+          ))}
+        </Box>
+
+        <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+          <TextField
+            label="Min $" value={minPrice} onChange={(e) => setMinPrice(e.target.value)}
+            size="small" type="number" inputProps={{ min: 0, step: 0.01 }} sx={{ flex: 1 }}
+          />
+          <TextField
+            label="Max $" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)}
+            size="small" type="number" inputProps={{ min: 0, step: 0.01 }} sx={{ flex: 1 }}
+          />
+        </Box>
+
         <FormControl fullWidth size="small" sx={{ mb: 2 }}>
           <InputLabel>Sort by</InputLabel>
           <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} label="Sort by">
@@ -103,8 +136,10 @@ export default function MarketplacePage() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(saved?.search ?? "")
-  const [rarity, setRarity] = useState(saved?.rarity ?? "")
-  const [priceRange, setPriceRange] = useState<[number, number]>(saved?.priceRange ?? [0, 800])
+  const [rarities, setRarities] = useState<string[]>(saved?.rarities ?? [])
+  const [minPrice, setMinPrice] = useState<string>(saved?.minPrice ?? "")
+  const [maxPrice, setMaxPrice] = useState<string>(saved?.maxPrice ?? "")
+  const [sellerSearch, setSellerSearch] = useState(saved?.sellerSearch ?? "")
   const [sortBy, setSortBy] = useState(saved?.sortBy ?? "created_at")
   const [ignoreOwn, setIgnoreOwn] = useState(saved?.ignoreOwn ?? false)
   const [showSold, setShowSold] = useState(saved?.showSold ?? false)
@@ -112,8 +147,8 @@ export default function MarketplacePage() {
 
   // Persist filters on any change
   useEffect(() => {
-    saveFilters({ search, rarity, priceRange, sortBy, ignoreOwn, showSold })
-  }, [search, rarity, priceRange, sortBy, ignoreOwn, showSold])
+    saveFilters({ search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold })
+  }, [search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold])
 
   // Sell dialog
   const [sellOpen, setSellOpen] = useState(false)
@@ -132,10 +167,11 @@ export default function MarketplacePage() {
   const fetchListings = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (rarity) params.set("rarity", rarity)
-    if (priceRange[0] > 0) params.set("minPrice", String(priceRange[0]))
-    if (priceRange[1] < 800) params.set("maxPrice", String(priceRange[1]))
+    if (rarities.length > 0) params.set("rarity", rarities.join(","))
+    if (minPrice) params.set("minPrice", minPrice)
+    if (maxPrice) params.set("maxPrice", maxPrice)
     if (search) params.set("search", search)
+    if (sellerSearch) params.set("sellerSearch", sellerSearch)
     if (ignoreOwn && user?.id) params.set("excludeSeller", user.id)
     if (showSold) params.set("showSold", "true")
     params.set("sortBy", sortBy)
@@ -143,7 +179,7 @@ export default function MarketplacePage() {
     const data = await res.json()
     setListings(Array.isArray(data) ? data : [])
     setLoading(false)
-  }, [rarity, priceRange, sortBy, search, ignoreOwn, showSold, user?.id])
+  }, [rarities, minPrice, maxPrice, sortBy, search, sellerSearch, ignoreOwn, showSold, user?.id])
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -242,8 +278,14 @@ export default function MarketplacePage() {
   const selectedGroup = selectedItemId ? groupedInventory.find((g) => g.item_id === selectedItemId) : null
 
   const filterProps = {
-    search, setSearch, rarity, setRarity, priceRange, setPriceRange,
-    sortBy, setSortBy, ignoreOwn, setIgnoreOwn, showSold, setShowSold,
+    search, setSearch,
+    rarities, setRarities,
+    minPrice, setMinPrice,
+    maxPrice, setMaxPrice,
+    sellerSearch, setSellerSearch,
+    sortBy, setSortBy,
+    ignoreOwn, setIgnoreOwn,
+    showSold, setShowSold,
     onApply: fetchListings,
   }
 
@@ -261,11 +303,26 @@ export default function MarketplacePage() {
         </Box>
       </Box>
 
+      {/* Login wall — blur content for guests */}
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
         <Box sx={{ display: { xs: "none", md: "block" } }}>
           <FilterPanel {...filterProps} />
         </Box>
-        <Box sx={{ flex: 1 }}>
+        <Box sx={{ flex: 1, position: "relative", minHeight: 300 }}>
+          {!user && (
+            <Box sx={{
+              position: "absolute", inset: 0, zIndex: 10,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: 2, backdropFilter: "blur(8px)", bgcolor: "rgba(255,255,255,0.6)", borderRadius: 2,
+              minHeight: 300,
+            }}>
+              <Typography variant="h6" fontWeight={700}>Sign in to browse the Marketplace</Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button variant="contained" component={NextLink} href="/login">Log In</Button>
+                <Button variant="outlined" component={NextLink} href="/register">Register</Button>
+              </Box>
+            </Box>
+          )}
           {loading ? (
             <Box textAlign="center" py={8}><CircularProgress /></Box>
           ) : listings.length === 0 ? (

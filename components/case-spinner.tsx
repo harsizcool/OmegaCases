@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Box, Typography } from "@mui/material"
+import { Box, Typography, useMediaQuery, useTheme } from "@mui/material"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
 
@@ -11,6 +11,13 @@ const TOTAL_ITEM = ITEM_WIDTH + ITEM_GAP
 const VISIBLE_ITEMS = 7
 const MAX_SPINNER_WIDTH = VISIBLE_ITEMS * TOTAL_ITEM - ITEM_GAP
 
+// Mobile reduced dimensions
+const ITEM_WIDTH_MOBILE = 90
+const ITEM_GAP_MOBILE = 6
+const TOTAL_ITEM_MOBILE = ITEM_WIDTH_MOBILE + ITEM_GAP_MOBILE
+const VISIBLE_ITEMS_MOBILE = 5
+const MAX_SPINNER_WIDTH_MOBILE = VISIBLE_ITEMS_MOBILE * TOTAL_ITEM_MOBILE - ITEM_GAP_MOBILE
+
 const TICK_SRC = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/case%20tick%20sound-XkLDyOzDrmlVl8p3DMaTwFZjDlwS2P.mp3"
 
 interface Props {
@@ -18,6 +25,7 @@ interface Props {
   targetItem: Item
   onComplete: () => void
   spinning: boolean
+  speed?: number  // 1 = normal, 2 = 2x
 }
 
 function playTick() {
@@ -28,44 +36,44 @@ function playTick() {
   } catch {}
 }
 
-export default function CaseSpinner({ items, targetItem, onComplete, spinning }: Props) {
+export default function CaseSpinner({ items, targetItem, onComplete, spinning, speed = 1 }: Props) {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
+
+  const itemW = isMobile ? ITEM_WIDTH_MOBILE : ITEM_WIDTH
+  const itemGap = isMobile ? ITEM_GAP_MOBILE : ITEM_GAP
+  const totalItem = itemW + itemGap
+  const maxWidth = isMobile ? MAX_SPINNER_WIDTH_MOBILE : MAX_SPINNER_WIDTH
+
   const containerRef = useRef<HTMLDivElement>(null)
-  const trackRef = useRef<HTMLDivElement>(null)
   const animFrameRef = useRef<number>(0)
   const startTimeRef = useRef<number>(0)
   const lastTickIndexRef = useRef<number>(-1)
   const [currentOffset, setCurrentOffset] = useState(0)
 
-  // Build a long strip: 60 random items, target forced near end
+  // Shorter strip on mobile to reduce DOM nodes
+  const stripLength = isMobile ? 40 : 60
+  const targetPos = isMobile ? 32 : 52
+
   const stripItems = useRef<Item[]>([])
   const targetIndexRef = useRef(0)
 
   useEffect(() => {
     if (!spinning || items.length === 0) return
 
-    const total = 60
-    const targetPos = 52
     const strip: Item[] = []
-    for (let i = 0; i < total; i++) {
-      if (i === targetPos) {
-        strip.push(targetItem)
-      } else {
-        strip.push(items[Math.floor(Math.random() * items.length)])
-      }
+    for (let i = 0; i < stripLength; i++) {
+      strip.push(i === targetPos ? targetItem : items[Math.floor(Math.random() * items.length)])
     }
     stripItems.current = strip
     targetIndexRef.current = targetPos
 
-    // Use actual container width to compute center offset so target always lands under the marker
-    const containerWidth = containerRef.current?.offsetWidth ?? MAX_SPINNER_WIDTH
+    const containerWidth = containerRef.current?.offsetWidth ?? maxWidth
     const centerOffset = Math.floor(containerWidth / 2)
-
-    // Final offset: center the target item under the center marker
-    const finalOffset = targetPos * TOTAL_ITEM - centerOffset + ITEM_WIDTH / 2
-
+    const finalOffset = targetPos * totalItem - centerOffset + itemW / 2
     const startOffset = 0
     const distance = finalOffset - startOffset
-    const duration = 5000
+    const duration = 5000 / speed  // halve duration for 2x speed
 
     startTimeRef.current = performance.now()
     lastTickIndexRef.current = -1
@@ -73,13 +81,11 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
     const animate = (now: number) => {
       const elapsed = now - startTimeRef.current
       const t = Math.min(elapsed / duration, 1)
-
-      // Ease out cubic
       const eased = 1 - Math.pow(1 - t, 3)
       const offset = startOffset + distance * eased
       setCurrentOffset(offset)
 
-      const currentIndex = Math.floor(offset / TOTAL_ITEM)
+      const currentIndex = Math.floor(offset / totalItem)
       if (currentIndex !== lastTickIndexRef.current && t < 0.95) {
         lastTickIndexRef.current = currentIndex
         playTick()
@@ -95,7 +101,7 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
 
     animFrameRef.current = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(animFrameRef.current)
-  }, [spinning, targetItem, items, onComplete])
+  }, [spinning, targetItem, items, onComplete, speed, totalItem, itemW, stripLength, targetPos, maxWidth])
 
   return (
     <Box
@@ -103,7 +109,7 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
       sx={{
         position: "relative",
         width: "100%",
-        maxWidth: MAX_SPINNER_WIDTH,
+        maxWidth: maxWidth,
         overflow: "hidden",
         borderRadius: 2,
         border: "2px solid #1976d2",
@@ -111,7 +117,7 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
         mx: "auto",
       }}
     >
-      {/* Center marker — always at 50% of actual container */}
+      {/* Center marker */}
       <Box
         sx={{
           position: "absolute",
@@ -127,15 +133,14 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
         }}
       />
       {/* Fade edges */}
-      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 60, background: "linear-gradient(to right, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
-      <Box sx={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 60, background: "linear-gradient(to left, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
+      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to right, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
+      <Box sx={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to left, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
 
-      {/* Track */}
+      {/* Track — use CSS transform only, no layout triggers */}
       <Box
-        ref={trackRef}
         sx={{
           display: "flex",
-          gap: `${ITEM_GAP}px`,
+          gap: `${itemGap}px`,
           transform: `translateX(-${currentOffset}px)`,
           willChange: "transform",
           py: 1,
@@ -149,13 +154,13 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
             <Box
               key={i}
               sx={{
-                width: ITEM_WIDTH,
+                width: itemW,
                 flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 0.5,
-                p: 1,
+                p: isMobile ? 0.5 : 1,
                 borderRadius: 2,
                 border: `2px solid ${color}`,
                 boxShadow: glow,
@@ -166,7 +171,7 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
                 component="img"
                 src={item.image_url}
                 alt={item.name}
-                sx={{ width: 80, height: 80, objectFit: "contain" }}
+                sx={{ width: isMobile ? 52 : 80, height: isMobile ? 52 : 80, objectFit: "contain" }}
               />
               <Typography
                 variant="caption"
@@ -174,12 +179,12 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning }:
                 textAlign="center"
                 sx={{
                   color,
-                  fontSize: "0.65rem",
+                  fontSize: isMobile ? "0.55rem" : "0.65rem",
                   lineHeight: 1.2,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  maxWidth: 120,
+                  maxWidth: isMobile ? 80 : 120,
                 }}
               >
                 {item.name}
