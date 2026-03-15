@@ -64,6 +64,7 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
           pollRef.current = null
           if (data.status === "confirmed" || data.already_confirmed || data.credited) {
             await refreshUser()
+            setTimeout(() => window.location.reload(), 2000)
           }
         }
       } catch {}
