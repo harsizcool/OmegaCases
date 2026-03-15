@@ -7,7 +7,7 @@ import {
   CardMedia, Chip, CircularProgress, Alert, Button, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, FormControlLabel,
-  Checkbox, Badge,
+  Checkbox, Badge, Tooltip, Pagination,
 } from "@mui/material"
 import { useAuth } from "@/lib/auth-context"
 import type { InventoryItem, Rarity } from "@/lib/types"
@@ -35,6 +35,8 @@ export default function UserPage() {
 
   const [profile, setProfile] = useState<any>(null)
   const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [totalItems, setTotalItems] = useState(0)
+  const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -56,13 +58,14 @@ export default function UserPage() {
       const profileData = await profileRes.json()
       setProfile(profileData)
 
-      const invRes = await fetch(`/api/inventory/${profileData.id}`)
+      const invRes = await fetch(`/api/inventory/${profileData.id}?page=${page}`)
       const invData = await invRes.json()
-      setInventory(Array.isArray(invData) ? invData : [])
+      setInventory(Array.isArray(invData.items) ? invData.items : [])
+      setTotalItems(invData.total ?? 0)
       setLoading(false)
     }
     load()
-  }, [username])
+  }, [username, page])
 
   const rapValue = inventory.reduce((sum, inv) => sum + Number(inv.items?.rap || 0), 0)
   const isMe = me?.username === username
@@ -174,9 +177,9 @@ export default function UserPage() {
             <strong style={{ color: "#1976d2" }}>${rapValue.toFixed(2)}</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {inventory.length} item{inventory.length !== 1 ? "s" : ""}
+            {totalItems} item{totalItems !== 1 ? "s" : ""}
             {bundle && bundledItems.length !== inventory.length && (
-              <> &middot; {bundledItems.length} unique</>
+              <> &middot; {bundledItems.length} unique this page</>
             )}
             {profile?.cases > 0 && (
               <> &middot; <strong>{Number(profile.cases).toLocaleString()}</strong> total case{profile.cases !== 1 ? "s" : ""} opened</>
@@ -256,14 +259,16 @@ export default function UserPage() {
                           size="small"
                           sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
                         />
-                        <Typography
-                          variant="caption"
-                          display="block"
-                          fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        >
-                          {b.name}
-                        </Typography>
+                        <Tooltip title={b.name} placement="top" arrow>
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            fontWeight={600}
+                            sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          >
+                            {b.name}
+                          </Typography>
+                        </Tooltip>
                         <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
                           RAP: ${b.rap.toFixed(2)}
                         </Typography>
@@ -320,14 +325,16 @@ export default function UserPage() {
                         size="small"
                         sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
                       />
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        fontWeight={600}
-                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      >
-                        {item.name}
-                      </Typography>
+                      <Tooltip title={item.name} placement="top" arrow>
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          fontWeight={600}
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {item.name}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" color="primary.main" fontWeight={700} display="block">
                         RAP: ${Number(item.rap).toFixed(2)}
                       </Typography>
@@ -351,6 +358,20 @@ export default function UserPage() {
             )
           })}
         </Grid>
+      )}
+
+      {/* Pagination */}
+      {totalItems > 1000 && (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+          <Pagination
+            count={Math.ceil(totalItems / 1000)}
+            page={page + 1}
+            onChange={(_, p) => setPage(p - 1)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* List item dialog */}

@@ -6,7 +6,7 @@ import {
   Chip, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider, Checkbox, FormControlLabel,
+  Avatar, ListItemText, Divider, Checkbox, FormControlLabel, Tooltip,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"
@@ -279,10 +279,12 @@ export default function MarketplacePage() {
                         sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }} />
                       <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
                         <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                        <Typography variant="caption" display="block" fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}>
-                          {item.name}
-                        </Typography>
+                        <Tooltip title={item.name} placement="top" arrow>
+                          <Typography variant="caption" display="block" fontWeight={600}
+                            sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}>
+                            {item.name}
+                          </Typography>
+                        </Tooltip>
                         <Typography variant="body2" fontWeight={700} color={listing.status === "sold" ? "text.disabled" : "primary.main"}>
                           ${Number(listing.price).toFixed(2)}
                           {listing.status === "sold" && <Chip label="SOLD" size="small" sx={{ ml: 0.5, fontSize: "0.55rem", height: 16 }} color="default" />}

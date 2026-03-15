@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import {
   Container, Box, Typography, Button, Card, CardContent, CardMedia,
   TextField, Select, MenuItem, FormControl, InputLabel, Grid,
-  Alert, CircularProgress, Chip, Tab, Tabs, Slider,
+  Alert, CircularProgress, Chip, Tab, Tabs, Slider, Tooltip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import UploadIcon from "@mui/icons-material/Upload"
@@ -238,10 +238,12 @@ export default function AdminPage() {
                       />
                       <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
                         <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                        <Typography variant="caption" display="block" fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.name}
-                        </Typography>
+                        <Tooltip title={item.name} placement="top" arrow>
+                          <Typography variant="caption" display="block" fontWeight={600}
+                            sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.name}
+                          </Typography>
+                        </Tooltip>
                         <Typography variant="caption" color="text.secondary">
                           {chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}
                         </Typography>

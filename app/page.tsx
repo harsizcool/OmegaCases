@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import NextLink from "next/link"
 import {
   Container, Box, Typography, Button, Grid, Card, CardContent,
-  CardMedia, Chip, CircularProgress, Divider, Stack,
+  CardMedia, Chip, CircularProgress, Divider, Stack, Tooltip,
 } from "@mui/material"
 import LockIcon from "@mui/icons-material/Lock"
 import InventoryIcon from "@mui/icons-material/Inventory"
@@ -137,14 +137,16 @@ export default function HomePage() {
                         size="small"
                         sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
                       />
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        fontWeight={600}
-                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      >
-                        {item.name}
-                      </Typography>
+                      <Tooltip title={item.name} placement="top" arrow>
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          fontWeight={600}
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {item.name}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" color="primary.main" fontWeight={700}>
                         ${Number(item.market_price).toFixed(2)}
                       </Typography>
@@ -245,10 +247,12 @@ export default function HomePage() {
                     />
                     <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
                       <Chip label={listing.items.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                      <Typography variant="caption" display="block" fontWeight={600}
-                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {listing.items.name}
-                      </Typography>
+                      <Tooltip title={listing.items.name} placement="top" arrow>
+                        <Typography variant="caption" display="block" fontWeight={600}
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {listing.items.name}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" color="primary.main" fontWeight={700}>
                         ${Number(listing.price).toFixed(2)}
                       </Typography>
