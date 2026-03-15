@@ -20,6 +20,160 @@ import type { InventoryItem, Rarity } from "@/lib/types"
 
 const MAX_ITEMS = 6
 const MAX_BALANCE = 50
+const RARITIES_LIST = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
+
+function ItemSlots({
+  items,
+  inventory,
+  onAdd,
+  onRemove,
+  label,
+}: {
+  items: TradeItem[]
+  inventory: InventoryItem[]
+  onAdd: (inv: InventoryItem) => void
+  onRemove: (id: string) => void
+  label: string
+}) {
+  const [search, setSearch] = useState("")
+  const [rarityFilter, setRarityFilter] = useState<string>("")
+
+  const available = inventory.filter((inv) => !items.find((i) => i.id === inv.id))
+  const filtered = available.filter((inv) => {
+    const matchSearch = !search || inv.items?.name.toLowerCase().includes(search.toLowerCase())
+    const matchRarity = !rarityFilter || inv.items?.rarity === rarityFilter
+    return matchSearch && matchRarity
+  })
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
+        <Typography variant="caption" color="primary.main" fontWeight={600}>
+          RAP: ${items.reduce((s, ti) => s + ti.item.rap, 0).toFixed(2)}
+        </Typography>
+      </Box>
+
+      {/* Selected slots */}
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1, minHeight: 56 }}>
+        {items.map((ti, idx) => (
+          <Badge
+            key={`${ti.id}-${idx}`}
+            badgeContent={
+              <IconButton
+                size="small"
+                onClick={() => onRemove(ti.id)}
+                sx={{ bgcolor: "error.main", color: "#fff", width: 16, height: 16, p: 0 }}
+              >
+                <CloseIcon sx={{ fontSize: 10 }} />
+              </IconButton>
+            }
+            overlap="circular"
+            anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <Tooltip title={`${ti.item.name} — RAP: $${ti.item.rap.toFixed(2)}`}>
+              <Box
+                component="img"
+                src={ti.item.image_url}
+                alt={ti.item.name}
+                sx={{
+                  width: 52, height: 52, objectFit: "contain", borderRadius: 1,
+                  border: `2px solid ${RARITY_COLORS[ti.item.rarity as Rarity]}66`,
+                  bgcolor: "#f8fbff", cursor: "pointer",
+                }}
+              />
+            </Tooltip>
+          </Badge>
+        ))}
+        {items.length < MAX_ITEMS && (
+          <Box
+            sx={{
+              width: 52, height: 52, border: "2px dashed #1976d244", borderRadius: 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#1976d266",
+            }}
+          >
+            <AddIcon fontSize="small" />
+          </Box>
+        )}
+      </Box>
+
+      {/* Search + rarity filter + available items */}
+      {items.length < MAX_ITEMS && available.length > 0 && (
+        <>
+          <TextField
+            size="small"
+            placeholder="Search items..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            fullWidth
+            sx={{ mb: 0.75 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {/* Rarity filter chips */}
+          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1 }}>
+            <Chip
+              label="All"
+              size="small"
+              onClick={() => setRarityFilter("")}
+              variant={rarityFilter === "" ? "filled" : "outlined"}
+              sx={{ fontSize: "0.65rem", height: 20, cursor: "pointer" }}
+            />
+            {RARITIES_LIST.map((r) => (
+              <Chip
+                key={r}
+                label={r}
+                size="small"
+                onClick={() => setRarityFilter(rarityFilter === r ? "" : r)}
+                variant={rarityFilter === r ? "filled" : "outlined"}
+                sx={{
+                  fontSize: "0.65rem", height: 20, cursor: "pointer",
+                  bgcolor: rarityFilter === r ? RARITY_COLORS[r as Rarity] : undefined,
+                  color: rarityFilter === r ? "#fff" : RARITY_COLORS[r as Rarity],
+                  borderColor: RARITY_COLORS[r as Rarity],
+                }}
+              />
+            ))}
+          </Box>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxHeight: 130, overflowY: "auto" }}>
+            {filtered.map((inv) => (
+              <Tooltip
+                key={inv.id}
+                title={`${inv.items?.name} — RAP: $${Number(inv.items?.rap || 0).toFixed(2)}`}
+              >
+                <Box
+                  component="img"
+                  src={inv.items?.image_url}
+                  alt={inv.items?.name}
+                  onClick={() => onAdd(inv)}
+                  sx={{
+                    width: 42, height: 42, objectFit: "contain", borderRadius: 1,
+                    border: `2px solid ${RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"]}44`,
+                    bgcolor: "#f8fbff", cursor: "pointer",
+                    "&:hover": { opacity: 0.8, transform: "scale(1.06)" },
+                    transition: "all 0.1s",
+                  }}
+                />
+              </Tooltip>
+            ))}
+            {filtered.length === 0 && (
+              <Typography variant="caption" color="text.secondary">No items match.</Typography>
+            )}
+          </Box>
+        </>
+      )}
+      {items.length === MAX_ITEMS && (
+        <Typography variant="caption" color="text.secondary">Max {MAX_ITEMS} items reached</Typography>
+      )}
+    </Box>
+  )
+}
 
 interface TradeItem {
   id: string
@@ -100,15 +254,32 @@ export default function TradePage() {
 
   const fetchMyInventory = async () => {
     if (!user) return
-    const res = await fetch(`/api/inventory/${user.id}`)
-    const data = await res.json()
-    setMyInventory(Array.isArray(data) ? data : [])
+    // Paginate through all pages since API now returns { items, total, pageSize }
+    let all: InventoryItem[] = []
+    let page = 0
+    while (true) {
+      const res = await fetch(`/api/inventory/${user.id}?page=${page}`)
+      const data = await res.json()
+      const batch = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
+      all = all.concat(batch)
+      if (batch.length < 1000) break
+      page++
+    }
+    setMyInventory(all)
   }
 
   const fetchTheirInventory = async (userId: string) => {
-    const res = await fetch(`/api/inventory/${userId}`)
-    const data = await res.json()
-    setTheirInventory(Array.isArray(data) ? data : [])
+    let all: InventoryItem[] = []
+    let page = 0
+    while (true) {
+      const res = await fetch(`/api/inventory/${userId}?page=${page}`)
+      const data = await res.json()
+      const batch = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
+      all = all.concat(batch)
+      if (batch.length < 1000) break
+      page++
+    }
+    setTheirInventory(all)
   }
 
   const fetchUsers = async () => {
@@ -212,159 +383,6 @@ export default function TradePage() {
     }
   }
 
-  const ItemSlots = ({
-    items,
-    inventory,
-    onAdd,
-    onRemove,
-    label,
-  }: {
-    items: TradeItem[]
-    inventory: InventoryItem[]
-    onAdd: (inv: InventoryItem) => void
-    onRemove: (id: string) => void
-    label: string
-  }) => {
-    const [search, setSearch] = useState("")
-    const [rarityFilter, setRarityFilter] = useState<string>("")
-    const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
-
-    const available = inventory.filter((inv) => !items.find((i) => i.id === inv.id))
-    const filtered = available.filter((inv) => {
-      const matchSearch = !search || inv.items?.name.toLowerCase().includes(search.toLowerCase())
-      const matchRarity = !rarityFilter || inv.items?.rarity === rarityFilter
-      return matchSearch && matchRarity
-    })
-
-    return (
-      <Box>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-          <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
-          <Typography variant="caption" color="primary.main" fontWeight={600}>
-            RAP: ${items.reduce((s, ti) => s + ti.item.rap, 0).toFixed(2)}
-          </Typography>
-        </Box>
-
-        {/* Selected slots */}
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1, minHeight: 56 }}>
-          {items.map((ti) => (
-            <Badge
-              key={ti.id}
-              badgeContent={
-                <IconButton
-                  size="small"
-                  onClick={() => onRemove(ti.id)}
-                  sx={{ bgcolor: "error.main", color: "#fff", width: 16, height: 16, p: 0 }}
-                >
-                  <CloseIcon sx={{ fontSize: 10 }} />
-                </IconButton>
-              }
-              overlap="circular"
-              anchorOrigin={{ vertical: "top", horizontal: "right" }}
-            >
-              <Tooltip title={`${ti.item.name} — RAP: $${ti.item.rap.toFixed(2)}`}>
-                <Box
-                  component="img"
-                  src={ti.item.image_url}
-                  alt={ti.item.name}
-                  sx={{
-                    width: 52, height: 52, objectFit: "contain", borderRadius: 1,
-                    border: `2px solid ${RARITY_COLORS[ti.item.rarity as Rarity]}66`,
-                    bgcolor: "#f8fbff", cursor: "pointer",
-                  }}
-                />
-              </Tooltip>
-            </Badge>
-          ))}
-          {items.length < MAX_ITEMS && (
-            <Box
-              sx={{
-                width: 52, height: 52, border: "2px dashed #1976d244", borderRadius: 1,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#1976d266",
-              }}
-            >
-              <AddIcon fontSize="small" />
-            </Box>
-          )}
-        </Box>
-
-        {/* Search + rarity filter + available items */}
-        {items.length < MAX_ITEMS && available.length > 0 && (
-          <>
-            <TextField
-              size="small"
-              placeholder="Search items..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              fullWidth
-              sx={{ mb: 0.75 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            {/* Rarity filter chips */}
-            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1 }}>
-              <Chip
-                label="All"
-                size="small"
-                onClick={() => setRarityFilter("")}
-                variant={rarityFilter === "" ? "filled" : "outlined"}
-                sx={{ fontSize: "0.65rem", height: 20, cursor: "pointer" }}
-              />
-              {RARITIES.map((r) => (
-                <Chip
-                  key={r}
-                  label={r}
-                  size="small"
-                  onClick={() => setRarityFilter(rarityFilter === r ? "" : r)}
-                  variant={rarityFilter === r ? "filled" : "outlined"}
-                  sx={{
-                    fontSize: "0.65rem", height: 20, cursor: "pointer",
-                    bgcolor: rarityFilter === r ? RARITY_COLORS[r as Rarity] : undefined,
-                    color: rarityFilter === r ? "#fff" : RARITY_COLORS[r as Rarity],
-                    borderColor: RARITY_COLORS[r as Rarity],
-                  }}
-                />
-              ))}
-            </Box>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxHeight: 130, overflowY: "auto" }}>
-              {filtered.map((inv) => (
-                <Tooltip
-                  key={inv.id}
-                  title={`${inv.items?.name} — RAP: $${Number(inv.items?.rap || 0).toFixed(2)}`}
-                >
-                  <Box
-                    component="img"
-                    src={inv.items?.image_url}
-                    alt={inv.items?.name}
-                    onClick={() => onAdd(inv)}
-                    sx={{
-                      width: 42, height: 42, objectFit: "contain", borderRadius: 1,
-                      border: `2px solid ${RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"]}44`,
-                      bgcolor: "#f8fbff", cursor: "pointer",
-                      "&:hover": { opacity: 0.8, transform: "scale(1.06)" },
-                      transition: "all 0.1s",
-                    }}
-                  />
-                </Tooltip>
-              ))}
-              {filtered.length === 0 && (
-                <Typography variant="caption" color="text.secondary">No items match.</Typography>
-              )}
-            </Box>
-          </>
-        )}
-        {items.length === MAX_ITEMS && (
-          <Typography variant="caption" color="text.secondary">Max {MAX_ITEMS} items reached</Typography>
-        )}
-      </Box>
-    )
-  }
 
   const TradeCard = ({ trade, isSent }: { trade: Trade; isSent: boolean }) => {
     const other = isSent ? trade.receiver : trade.sender
@@ -436,8 +454,8 @@ export default function TradePage() {
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {leftItems.map((ti) => (
-                  <Tooltip key={ti.id} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
+                {leftItems.map((ti, idx) => (
+                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
                     <Box
                       component="img"
                       src={ti.inventory.items.image_url}
@@ -474,8 +492,8 @@ export default function TradePage() {
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {rightItems.map((ti) => (
-                  <Tooltip key={ti.id} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
+                {rightItems.map((ti, idx) => (
+                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
                     <Box
                       component="img"
                       src={ti.inventory.items.image_url}

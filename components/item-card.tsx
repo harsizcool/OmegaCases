@@ -1,6 +1,6 @@
 "use client"
 
-import { Box, Chip, Typography } from "@mui/material"
+import { Box, Chip, Typography, Tooltip } from "@mui/material"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
 
@@ -60,14 +60,16 @@ export default function ItemCard({ item, size = "md", showPrice = false, onClick
           "& .MuiChip-label": { px: 0.8 },
         }}
       />
-      <Typography
-        variant="caption"
-        textAlign="center"
-        fontWeight={600}
-        sx={{ lineHeight: 1.2, maxWidth: dims, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-      >
-        {item.name}
-      </Typography>
+      <Tooltip title={item.name} placement="top" arrow>
+        <Typography
+          variant="caption"
+          textAlign="center"
+          fontWeight={600}
+          sx={{ lineHeight: 1.2, maxWidth: dims, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {item.name}
+        </Typography>
+      </Tooltip>
       {showPrice && (
         <Typography variant="caption" color="primary.main" fontWeight={700}>
           ${Number(item.market_price).toFixed(2)}

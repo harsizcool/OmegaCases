@@ -3,16 +3,20 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import NextLink from "next/link"
+import dynamic from "next/dynamic"
 import {
-  Container, Box, Typography, Card, CardMedia, Chip, Button,
-  CircularProgress, Alert, Divider, Avatar, Grid,
+  Container, Box, Typography, Button, Card, CardMedia, CardContent,
+  Chip, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
+  DialogActions, TextField, Divider, Tooltip, Grid, Avatar,
 } from "@mui/material"
-import ArrowBackIcon from "@mui/icons-material/ArrowBack"
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
 import type { Listing, Sale, Rarity } from "@/lib/types"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
+
+// Single dynamic import for the whole chart — avoids Turbopack multi-chunk split errors
+const SalesPriceChart = dynamic(() => import("@/components/sales-price-chart"), { ssr: false })
 
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>()
@@ -115,33 +119,7 @@ export default function ListingPage() {
                 <Typography color="text.secondary">No sales history yet.</Typography>
               </Box>
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 11 }}
-                    interval="preserveStartEnd"
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => `$${v}`}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "Sale Price"]}
-                    labelFormatter={(l) => `Date: ${l}`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#1976d2"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: "#1976d2" }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <SalesPriceChart data={chartData} color="#1976d2" />
             )}
 
             {sales.length > 0 && (
@@ -186,7 +164,14 @@ export default function ListingPage() {
               size="small"
               sx={{ bgcolor: rarityColor, color: "#fff", mb: 1 }}
             />
-            <Typography variant="h5" fontWeight={800} gutterBottom>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              gutterBottom
+              component={NextLink}
+              href={`/item/${encodeURIComponent(item?.name ?? "")}`}
+              sx={{ color: "text.primary", textDecoration: "none", "&:hover": { textDecoration: "underline", color: "primary.main" } }}
+            >
               {item?.name}
             </Typography>
 

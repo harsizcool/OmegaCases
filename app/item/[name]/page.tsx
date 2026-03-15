@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import dynamic from "next/dynamic"
 import {
   Container, Box, Typography, Chip, CircularProgress, Alert,
   Grid, Card, Avatar, Button, Paper,
 } from "@mui/material"
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import type { Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import NextLink from "next/link"
 import StorefrontIcon from "@mui/icons-material/Storefront"
 import PeopleIcon from "@mui/icons-material/People"
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
+
+// Single dynamic import — avoids Turbopack multi-chunk split errors
+const SalesPriceChart = dynamic(() => import("@/components/sales-price-chart"), { ssr: false })
 
 const RARITY_ODDS: Record<string, string> = {
   Common: "1 in 2",
@@ -165,19 +168,13 @@ export default function ItemPage() {
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, color: BLUE }}>
                 Recent Sales (last {sales.length})
               </Typography>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={sales.map((s: any, i: number) => ({
-                  sale: i + 1,
+              <SalesPriceChart
+                data={sales.map((s: any, i: number) => ({
+                  date: `#${i + 1}`,
                   price: Number(s.price),
-                  date: new Date(s.sold_at).toLocaleDateString(),
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="sale" label={{ value: "Sale #", position: "insideBottom", offset: -4 }} tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "Price"]} labelFormatter={(l) => `Sale #${l}`} />
-                  <Line type="monotone" dataKey="price" stroke={BLUE} strokeWidth={2} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
+                }))}
+                color={BLUE}
+              />
             </Box>
           ) : (
             <Typography color="text.secondary">No sales recorded yet.</Typography>

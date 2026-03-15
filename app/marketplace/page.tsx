@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Container, Grid, Box, Typography, Card, CardContent, CardMedia,
-  Chip, Slider, TextField, Select, MenuItem, FormControl, InputLabel,
+  Chip, TextField, Select, MenuItem, FormControl, InputLabel,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider, Checkbox, FormControlLabel,
+  Avatar, ListItemText, Divider, Checkbox, FormControlLabel, Tooltip, Slider, Pagination,
 } from "@mui/material"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import AddIcon from "@mui/icons-material/Add"
@@ -16,16 +16,17 @@ import type { Listing, Rarity, InventoryItem } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import NextLink from "next/link"
 import { useRouter } from "next/navigation"
+import FilterPanel from "@/components/marketplace-filter-panel"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 const MAX_LISTING_PRICE = 800
 const STORAGE_KEY = "omegacases_marketplace_filters"
 
 const RARITY_PRICE_CAPS: Record<string, number> = {
-  Common: 0.04,
-  Uncommon: 0.10,
-  Rare: 0.40,
-  Legendary: 2.00,
+  Common: 0.10,
+  Uncommon: 0.50,
+  Rare: 1.00,
+  Legendary: 10.00,
   Omega: MAX_LISTING_PRICE,
 }
 
@@ -39,85 +40,54 @@ function saveFilters(f: object) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(f))
 }
 
-// Stable top-level component — never re-created between parent renders
-function FilterPanel({
-  search, setSearch, rarity, setRarity, priceRange, setPriceRange, sortBy, setSortBy,
-  ignoreOwn, setIgnoreOwn, showSold, setShowSold, onApply,
-}: {
-  search: string; setSearch: (v: string) => void
-  rarity: string; setRarity: (v: string) => void
-  priceRange: [number, number]; setPriceRange: (v: [number, number]) => void
-  sortBy: string; setSortBy: (v: string) => void
-  ignoreOwn: boolean; setIgnoreOwn: (v: boolean) => void
-  showSold: boolean; setShowSold: (v: boolean) => void
-  onApply: () => void
-}) {
-  return (
-    <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
-      <Card sx={{ p: 2, position: { md: "sticky" }, top: { md: 80 } }}>
-        <Typography variant="subtitle1" fontWeight={700} gutterBottom>Filters</Typography>
-        <TextField label="Search" value={search} onChange={(e) => setSearch(e.target.value)}
-          fullWidth size="small" sx={{ mb: 2 }} autoComplete="off" />
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Rarity</InputLabel>
-          <Select value={rarity} onChange={(e) => setRarity(e.target.value)} label="Rarity">
-            <MenuItem value="">All</MenuItem>
-            {RARITIES.map((r) => (
-              <MenuItem key={r} value={r}>
-                <Chip label={r} size="small" sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", mr: 1 }} />{r}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Typography variant="caption" color="text.secondary">Price: ${priceRange[0]} – ${priceRange[1]}</Typography>
-        <Slider value={priceRange} onChange={(_, v) => setPriceRange(v as [number, number])}
-          min={0} max={800} step={1} sx={{ mt: 1, mb: 2 }} />
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Sort by</InputLabel>
-          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} label="Sort by">
-            <MenuItem value="created_at">Newest</MenuItem>
-            <MenuItem value="price">Price</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControlLabel
-          control={<Checkbox checked={ignoreOwn} onChange={(e) => setIgnoreOwn(e.target.checked)} size="small" />}
-          label={<Typography variant="body2">Ignore Your Listings</Typography>}
-          sx={{ mb: 0.5, display: "block" }}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={showSold} onChange={(e) => setShowSold(e.target.checked)} size="small" />}
-          label={<Typography variant="body2">Show Sold Items</Typography>}
-          sx={{ mb: 1.5, display: "block" }}
-        />
-        <Button variant="outlined" fullWidth onClick={onApply}>Apply</Button>
-      </Card>
-    </Box>
-  )
-}
-
 export default function MarketplacePage() {
   const { user } = useAuth()
   const router = useRouter()
-  const saved = loadFilters()
 
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState(saved?.search ?? "")
-  const [rarity, setRarity] = useState(saved?.rarity ?? "")
-  const [priceRange, setPriceRange] = useState<[number, number]>(saved?.priceRange ?? [0, 800])
-  const [sortBy, setSortBy] = useState(saved?.sortBy ?? "created_at")
-  const [ignoreOwn, setIgnoreOwn] = useState(saved?.ignoreOwn ?? false)
-  const [showSold, setShowSold] = useState(saved?.showSold ?? false)
+  const [page, setPage] = useState(0)
+  const [totalListings, setTotalListings] = useState(0)
+  const [search, setSearch] = useState("")
+  const [rarities, setRarities] = useState<string[]>([])
+  const [minPrice, setMinPrice] = useState<string>("")
+  const [maxPrice, setMaxPrice] = useState<string>("")
+  const [sellerSearch, setSellerSearch] = useState("")
+  const [sortBy, setSortBy] = useState("price")
+  const [ignoreOwn, setIgnoreOwn] = useState(false)
+  const [showSold, setShowSold] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
+
+  // Hydrate filters from localStorage on client only — avoids SSR mismatch
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")
+      if (saved) {
+        if (saved.search !== undefined) setSearch(saved.search)
+        // Only restore rarities if explicitly saved (not first visit)
+        if (Array.isArray(saved.rarities)) setRarities(saved.rarities)
+        if (saved.minPrice !== undefined) setMinPrice(saved.minPrice)
+        if (saved.maxPrice !== undefined) setMaxPrice(saved.maxPrice)
+        if (saved.sellerSearch !== undefined) setSellerSearch(saved.sellerSearch)
+        if (saved.sortBy) setSortBy(saved.sortBy)
+        if (saved.ignoreOwn != null) setIgnoreOwn(saved.ignoreOwn)
+        if (saved.showSold != null) setShowSold(saved.showSold)
+      }
+      // If no saved state, defaults (sort by price, no filters) already set above
+    } catch {}
+    setHydrated(true)
+  }, [])
 
   // Persist filters on any change
   useEffect(() => {
-    saveFilters({ search, rarity, priceRange, sortBy, ignoreOwn, showSold })
-  }, [search, rarity, priceRange, sortBy, ignoreOwn, showSold])
+    saveFilters({ search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold })
+  }, [search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold])
 
   // Sell dialog
   const [sellOpen, setSellOpen] = useState(false)
   const [myInventory, setMyInventory] = useState<InventoryItem[]>([])
+  const [myInventoryLoading, setMyInventoryLoading] = useState(false)
   // Step 1: show unique items; Step 2: show copies of selected unique item
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [sellItem, setSellItem] = useState<InventoryItem | null>(null)
@@ -132,40 +102,81 @@ export default function MarketplacePage() {
   const fetchListings = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (rarity) params.set("rarity", rarity)
-    if (priceRange[0] > 0) params.set("minPrice", String(priceRange[0]))
-    if (priceRange[1] < 800) params.set("maxPrice", String(priceRange[1]))
+    if (rarities.length > 0) params.set("rarity", rarities.join(","))
+    if (minPrice) params.set("minPrice", minPrice)
+    if (maxPrice) params.set("maxPrice", maxPrice)
     if (search) params.set("search", search)
+    if (sellerSearch) params.set("sellerSearch", sellerSearch)
     if (ignoreOwn && user?.id) params.set("excludeSeller", user.id)
     if (showSold) params.set("showSold", "true")
     params.set("sortBy", sortBy)
+    params.set("page", String(page))
     const res = await fetch(`/api/listings?${params}`)
     const data = await res.json()
-    setListings(Array.isArray(data) ? data : [])
+    // API returns { listings, total, page, pageSize } when paginated
+    if (data && Array.isArray(data.listings)) {
+      setListings(data.listings)
+      setTotalListings(data.total ?? 0)
+    } else {
+      setListings(Array.isArray(data) ? data : [])
+      setTotalListings(0)
+    }
     setLoading(false)
-  }, [rarity, priceRange, sortBy, search, ignoreOwn, showSold, user?.id])
+  }, [rarities, minPrice, maxPrice, sortBy, search, sellerSearch, ignoreOwn, showSold, user?.id, page])
+
+  // Reset to page 0 whenever filters change (but not when page itself changes)
+  const prevFiltersRef = useRef({ rarities, minPrice, maxPrice, search, sellerSearch, sortBy, ignoreOwn, showSold })
+  useEffect(() => {
+    const prev = prevFiltersRef.current
+    if (
+      prev.search !== search || prev.rarities !== rarities || prev.minPrice !== minPrice ||
+      prev.maxPrice !== maxPrice || prev.sellerSearch !== sellerSearch || prev.sortBy !== sortBy ||
+      prev.ignoreOwn !== ignoreOwn || prev.showSold !== showSold
+    ) {
+      setPage(0)
+      prevFiltersRef.current = { rarities, minPrice, maxPrice, search, sellerSearch, sortBy, ignoreOwn, showSold }
+    }
+  }, [rarities, minPrice, maxPrice, search, sellerSearch, sortBy, ignoreOwn, showSold])
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    if (!hydrated) return  // wait for localStorage hydration before first fetch
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(fetchListings, 300)
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current) }
-  }, [fetchListings])
+  }, [fetchListings, hydrated])
 
   const fetchMyInventory = async () => {
     if (!user) return
-    const allListingsRes = await fetch("/api/listings")
-    const allListings: Listing[] = await allListingsRes.json()
-    const listedInvIds = new Set(
-      Array.isArray(allListings)
-        ? allListings.filter((l) => l.seller_id === user.id).map((l) => l.inventory_id)
-        : []
-    )
-    const invRes = await fetch(`/api/inventory/${user.id}`)
-    const data: InventoryItem[] = await invRes.json()
-    const available = Array.isArray(data) ? data.filter((inv) => !listedInvIds.has(inv.id)) : []
-    setMyInventory(available)
-    setSellItem((prev) => prev ? (available.find((i) => i.id === prev.id) ?? null) : null)
+    setMyInventoryLoading(true)
+    try {
+      // Fetch all active listings to exclude already-listed items
+      const allListingsRes = await fetch("/api/listings?limit=10000")
+      const allListings: Listing[] = await allListingsRes.json()
+      const listedInvIds = new Set(
+        Array.isArray(allListings)
+          ? allListings.filter((l) => l.seller_id === user.id).map((l) => l.inventory_id)
+          : []
+      )
+
+      // Paginate through all inventory pages (API returns 1000 per page)
+      let allInv: InventoryItem[] = []
+      let page = 0
+      while (true) {
+        const res = await fetch(`/api/inventory/${user.id}?page=${page}`)
+        const data = await res.json()
+        const batch: InventoryItem[] = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
+        allInv = allInv.concat(batch)
+        if (batch.length < 1000) break
+        page++
+      }
+
+      const available = allInv.filter((inv) => !listedInvIds.has(inv.id))
+      setMyInventory(available)
+      setSellItem((prev) => prev ? (available.find((i) => i.id === prev.id) ?? null) : null)
+    } finally {
+      setMyInventoryLoading(false)
+    }
   }
 
   const openSellDialog = () => {
@@ -242,8 +253,14 @@ export default function MarketplacePage() {
   const selectedGroup = selectedItemId ? groupedInventory.find((g) => g.item_id === selectedItemId) : null
 
   const filterProps = {
-    search, setSearch, rarity, setRarity, priceRange, setPriceRange,
-    sortBy, setSortBy, ignoreOwn, setIgnoreOwn, showSold, setShowSold,
+    search, setSearch,
+    rarities, setRarities,
+    minPrice, setMinPrice,
+    maxPrice, setMaxPrice,
+    sellerSearch, setSellerSearch,
+    sortBy, setSortBy,
+    ignoreOwn, setIgnoreOwn,
+    showSold, setShowSold,
     onApply: fetchListings,
   }
 
@@ -261,60 +278,91 @@ export default function MarketplacePage() {
         </Box>
       </Box>
 
+      {/* Login wall — blur content for guests */}
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
         <Box sx={{ display: { xs: "none", md: "block" } }}>
-          <FilterPanel {...filterProps} />
+            {hydrated && <FilterPanel {...filterProps} />}
         </Box>
-        <Box sx={{ flex: 1 }}>
+        <Box sx={{ flex: 1, position: "relative", minHeight: 300 }}>
+          {!user && (
+            <Box sx={{
+              position: "absolute", inset: 0, zIndex: 10,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: 2, backdropFilter: "blur(8px)", bgcolor: "rgba(255,255,255,0.6)", borderRadius: 2,
+              minHeight: 300,
+            }}>
+              <Typography variant="h6" fontWeight={700}>Sign in to browse the Marketplace</Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button variant="contained" component={NextLink} href="/login">Log In</Button>
+                <Button variant="outlined" component={NextLink} href="/register">Register</Button>
+              </Box>
+            </Box>
+          )}
           {loading ? (
             <Box textAlign="center" py={8}><CircularProgress /></Box>
           ) : listings.length === 0 ? (
             <Box textAlign="center" py={8}><Typography color="text.secondary">No listings found</Typography></Box>
           ) : (
-            <Grid container spacing={2}>
-              {listings.map((listing) => {
-                const item = listing.items
-                if (!item) return null
-                const color = RARITY_COLORS[item.rarity as Rarity]
-                return (
-                  <Grid item key={listing.id} xs={6} sm={4} md={3} lg={2}>
-                    <Card
-                      component={NextLink}
-                      href={`/listing/${listing.id}`}
-                      sx={{
-                        cursor: "pointer", textDecoration: "none", display: "block",
-                        border: `1px solid ${color}33`,
-                        "&:hover": { boxShadow: `0 4px 20px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
-                      }}
-                    >
-                      <CardMedia component="img" image={item.image_url} alt={item.name}
-                        sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }} />
-                      <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                        <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                        <Typography variant="caption" display="block" fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}>
-                          {item.name}
-                        </Typography>
-                        <Typography variant="body2" fontWeight={700} color={listing.status === "sold" ? "text.disabled" : "primary.main"}>
-                          ${Number(listing.price).toFixed(2)}
-                          {listing.status === "sold" && <Chip label="SOLD" size="small" sx={{ ml: 0.5, fontSize: "0.55rem", height: 16 }} color="default" />}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          by {listing.users?.username || "—"}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                )
-              })}
-            </Grid>
+            <>
+              <Grid container spacing={2}>
+                {listings.map((listing) => {
+                  const item = listing.items
+                  if (!item) return null
+                  const color = RARITY_COLORS[item.rarity as Rarity]
+                  return (
+                    <Grid item key={listing.id} xs={6} sm={4} md={3} lg={2}>
+                      <Card
+                        component={NextLink}
+                        href={`/listing/${listing.id}`}
+                        sx={{
+                          cursor: "pointer", textDecoration: "none", display: "block",
+                          border: `1px solid ${color}33`,
+                          "&:hover": { boxShadow: `0 4px 20px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
+                        }}
+                      >
+                        <CardMedia component="img" image={item.image_url} alt={item.name}
+                          sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }} />
+                        <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                          <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
+                          <Tooltip title={item.name} placement="top" arrow>
+                            <Typography variant="caption" display="block" fontWeight={600}
+                              sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}>
+                              {item.name}
+                            </Typography>
+                          </Tooltip>
+                          <Typography variant="body2" fontWeight={700} color={listing.status === "sold" ? "text.disabled" : "primary.main"}>
+                            ${Number(listing.price).toFixed(2)}
+                            {listing.status === "sold" && <Chip label="SOLD" size="small" sx={{ ml: 0.5, fontSize: "0.55rem", height: 16 }} color="default" />}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            by {listing.users?.username || "—"}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )
+                })}
+              </Grid>
+              {totalListings > 24 && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+                  <Pagination
+                    count={Math.ceil(totalListings / 24)}
+                    page={page + 1}
+                    onChange={(_, p) => setPage(p - 1)}
+                    color="primary"
+                    showFirstButton
+                    showLastButton
+                  />
+                </Box>
+              )}
+            </>
           )}
         </Box>
       </Box>
 
       {/* Mobile filter drawer */}
       <Drawer anchor="left" open={filterOpen} onClose={() => setFilterOpen(false)}>
-        <Box sx={{ p: 2, width: 280 }}><FilterPanel {...filterProps} /></Box>
+        <Box sx={{ p: 2, width: 280 }}>{hydrated && <FilterPanel {...filterProps} />}</Box>
       </Drawer>
 
       {/* Sell dialog — two-step */}
@@ -332,6 +380,11 @@ export default function MarketplacePage() {
         <DialogContent>
           {sellSuccess ? (
             <Alert severity="success" sx={{ mt: 1 }}>Listed successfully!</Alert>
+          ) : myInventoryLoading ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 4, justifyContent: "center" }}>
+              <CircularProgress size={24} />
+              <Typography color="text.secondary">Loading your inventory…</Typography>
+            </Box>
           ) : myInventory.length === 0 ? (
             <Typography color="text.secondary" sx={{ mt: 1 }}>No items available to list.</Typography>
           ) : !selectedItemId ? (

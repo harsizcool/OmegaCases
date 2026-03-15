@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from "react"
 import {
   Container, Box, Typography, Button, Grid, Card, CardContent,
   Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, Divider, Badge,
+  Alert, Divider, Badge, Switch, FormControlLabel,
 } from "@mui/material"
 import LockIcon from "@mui/icons-material/Lock"
 import InventoryIcon from "@mui/icons-material/Inventory"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
+import SpeedIcon from "@mui/icons-material/Speed"
 import { useAuth } from "@/lib/auth-context"
 import CaseSpinner from "@/components/case-spinner"
 import Confetti from "@/components/confetti"
@@ -42,6 +43,21 @@ export default function OpenPage() {
   const [buyLoading, setBuyLoading] = useState(false)
   const [error, setError] = useState("")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
+
+  // 2x speed toggle — persisted to localStorage
+  const [doubleSpeed, setDoubleSpeed] = useState(false)
+  useEffect(() => {
+    try {
+      setDoubleSpeed(localStorage.getItem("omegacases_2x_speed") === "true")
+    } catch {}
+  }, [])
+  const toggleDoubleSpeed = () => {
+    setDoubleSpeed((prev) => {
+      const next = !prev
+      try { localStorage.setItem("omegacases_2x_speed", String(next)) } catch {}
+      return next
+    })
+  }
 
   useEffect(() => {
     fetch("/api/admin/items").then((r) => r.json()).then(setItems)
@@ -186,6 +202,7 @@ export default function OpenPage() {
                 targetItem={targetItem}
                 spinning={spinning}
                 onComplete={handleSpinComplete}
+                speed={doubleSpeed ? 2 : 1}
               />
             </Box>
           )}
@@ -253,6 +270,26 @@ export default function OpenPage() {
                   ? `Open a Case (${casesRemaining} remaining)`
                   : "Buy Cases Below to Spin"}
               </Button>
+              <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={doubleSpeed}
+                      onChange={toggleDoubleSpeed}
+                      size="small"
+                      color="warning"
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <SpeedIcon fontSize="small" sx={{ color: doubleSpeed ? "warning.main" : "text.secondary" }} />
+                      <Typography variant="body2" color={doubleSpeed ? "warning.main" : "text.secondary"} fontWeight={doubleSpeed ? 700 : 400}>
+                        2x Speed
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
             </Box>
           )}
 

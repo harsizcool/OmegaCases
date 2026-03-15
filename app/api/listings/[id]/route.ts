@@ -71,11 +71,32 @@ export async function POST(
       price: listing.price,
     })
 
-  // Update item market_price
-  await supabase
-    .from("items")
-    .update({ market_price: listing.price })
-    .eq("id", listing.item_id)
+  // Update item RAP and market_price to AVERAGE of ALL sales (paginated past 1000)
+  // Fetch all sales in pages of 1000
+  let allSales: { price: number }[] = []
+  let from = 0
+  const PAGE = 1000
+  while (true) {
+    const { data: page } = await supabase
+      .from("sales")
+      .select("price")
+      .eq("item_id", listing.item_id)
+      .range(from, from + PAGE - 1)
+    if (!page || page.length === 0) break
+    allSales = allSales.concat(page)
+    if (page.length < PAGE) break
+    from += PAGE
+  }
+
+  if (allSales.length > 0) {
+    const avgPrice = Math.round(
+      (allSales.reduce((sum, s) => sum + Number(s.price), 0) / allSales.length) * 100
+    ) / 100
+    await supabase
+      .from("items")
+      .update({ market_price: avgPrice, rap: avgPrice })
+      .eq("id", listing.item_id)
+  }
 
   return NextResponse.json({ success: true })
 }

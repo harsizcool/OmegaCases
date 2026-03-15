@@ -4,12 +4,13 @@ import { useEffect, useState, useRef } from "react"
 import {
   Container, Box, Typography, Button, Card, CardContent, CardMedia,
   TextField, Select, MenuItem, FormControl, InputLabel, Grid,
-  Alert, CircularProgress, Chip, Tab, Tabs, Slider,
+  Alert, CircularProgress, Chip, Tab, Tabs, Slider, Tooltip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import UploadIcon from "@mui/icons-material/Upload"
+import SaveIcon from "@mui/icons-material/Save"
 import { useAuth } from "@/lib/auth-context"
-import { createClient } from "@/lib/supabase/client"
+import { createClient as createBrowserClient } from "@/lib/supabase/client"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import { useRouter } from "next/navigation"
@@ -48,6 +49,15 @@ export default function AdminPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Settings tab state
+  const RARITIES_LIST = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
+  const DEFAULT_CAPS: Record<string, number> = { Common: 0.04, Uncommon: 0.10, Rare: 0.40, Legendary: 2.00, Omega: 800 }
+  const [caps, setCaps] = useState<Record<string, number>>(DEFAULT_CAPS)
+  const [capsLoading, setCapsLoading] = useState(false)
+  const [capsSaving, setCapsSaving] = useState(false)
+  const [capsError, setCapsError] = useState("")
+  const [capsSuccess, setCapsSuccess] = useState(false)
+
   // New item form
   const [name, setName] = useState("")
   const [imageUrl, setImageUrl] = useState("")
@@ -84,9 +94,50 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const loadCaps = async () => {
+    setCapsLoading(true)
+    try {
+      const res = await fetch("/api/admin/settings")
+      const data = await res.json()
+      if (data.rarity_price_caps) setCaps(data.rarity_price_caps)
+    } catch {}
+    setCapsLoading(false)
+  }
+
+  const saveCaps = async () => {
+    setCapsSaving(true)
+    setCapsError("")
+    setCapsSuccess(false)
+    try {
+      // Get session token from browser Supabase client for Authorization header
+      const browserDb = createBrowserClient()
+      const { data: { session } } = await browserDb.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error("Not authenticated")
+
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key: "rarity_price_caps", value: caps }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Failed to save")
+      }
+      setCapsSuccess(true)
+    } catch (e: any) {
+      setCapsError(e.message)
+    } finally {
+      setCapsSaving(false)
+    }
+  }
+
   useEffect(() => {
     if (user && !user.admin) { router.push("/"); return }
-    if (user?.admin) loadItems()
+    if (user?.admin) { loadItems(); loadCaps() }
   }, [user])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,15 +152,12 @@ export default function AdminPage() {
     if (!imageFile) return imageUrl || null
     setImageUploading(true)
     try {
-      const supabase = createClient()
-      const ext = imageFile.name.split(".").pop()
-      const path = `items/${Date.now()}.${ext}`
-      const { error } = await supabase.storage
-        .from("itemstuffs")
-        .upload(path, imageFile, { upsert: true })
-      if (error) throw error
-      const { data: urlData } = supabase.storage.from("itemstuffs").getPublicUrl(path)
-      return urlData.publicUrl
+      const fd = new FormData()
+      fd.append("file", imageFile)
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      return data.url
     } catch (e: any) {
       setCreateError(`Image upload failed: ${e.message}`)
       return null
@@ -165,6 +213,7 @@ export default function AdminPage() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
         <Tab label="Items" />
         <Tab label="Add Item" />
+        <Tab label="Settings" />
       </Tabs>
 
       {tab === 0 && (
@@ -189,10 +238,12 @@ export default function AdminPage() {
                       />
                       <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
                         <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                        <Typography variant="caption" display="block" fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.name}
-                        </Typography>
+                        <Tooltip title={item.name} placement="top" arrow>
+                          <Typography variant="caption" display="block" fontWeight={600}
+                            sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.name}
+                          </Typography>
+                        </Tooltip>
                         <Typography variant="caption" color="text.secondary">
                           {chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}
                         </Typography>
@@ -331,6 +382,49 @@ export default function AdminPage() {
                 {creating || imageUploading ? "Creating..." : "Create Item"}
               </Button>
             </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 2 && (
+        <Card sx={{ maxWidth: 480 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={700} gutterBottom>Game Settings</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Set the maximum listing price allowed per rarity on the marketplace.
+            </Typography>
+            {capsLoading ? <CircularProgress /> : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {RARITIES_LIST.map((r) => (
+                  <Box key={r} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Chip
+                      label={r}
+                      size="small"
+                      sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", width: 90, flexShrink: 0 }}
+                    />
+                    <TextField
+                      label="Max Price ($)"
+                      type="number"
+                      size="small"
+                      value={caps[r] ?? ""}
+                      onChange={(e) => setCaps((prev) => ({ ...prev, [r]: parseFloat(e.target.value) || 0 }))}
+                      inputProps={{ min: 0.01, step: 0.01 }}
+                      sx={{ flex: 1 }}
+                    />
+                  </Box>
+                ))}
+                {capsError && <Alert severity="error">{capsError}</Alert>}
+                {capsSuccess && <Alert severity="success">Settings saved!</Alert>}
+                <Button
+                  variant="contained"
+                  startIcon={capsSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
+                  disabled={capsSaving}
+                  onClick={saveCaps}
+                >
+                  {capsSaving ? "Saving..." : "Save Settings"}
+                </Button>
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}
