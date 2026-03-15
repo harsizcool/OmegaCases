@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -40,11 +40,40 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
   const [depositCrypto, setDepositCrypto] = useState("BTC")
   const [depositLoading, setDepositLoading] = useState(false)
   const [depositResult, setDepositResult] = useState<{
+    payment_id: string | number
     pay_address: string
     pay_amount: number
     pay_currency: string
   } | null>(null)
   const [depositError, setDepositError] = useState("")
+  const [pollStatus, setPollStatus] = useState<"waiting" | "confirming" | "confirmed" | "failed" | "expired">("waiting")
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Start polling when depositResult is set, stop when terminal
+  useEffect(() => {
+    if (!depositResult?.payment_id) return
+    setPollStatus("waiting")
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/payments/status/${depositResult.payment_id}`)
+        const data = await res.json()
+        if (data.status) setPollStatus(data.status as any)
+        if (data.terminal) {
+          clearInterval(pollRef.current!)
+          pollRef.current = null
+          if (data.status === "confirmed" || data.already_confirmed || data.credited) {
+            await refreshUser()
+          }
+        }
+      } catch {}
+    }
+
+    pollRef.current = setInterval(poll, 3000)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [depositResult?.payment_id])
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState("")
@@ -211,6 +240,23 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                 <Alert severity="info" sx={{ mt: 1 }}>
                   Balance will be credited automatically once confirmed on-chain.
                 </Alert>
+                {/* Live poll status */}
+                {pollStatus === "confirmed" ? (
+                  <Alert severity="success" sx={{ mt: 1 }}>
+                    Payment confirmed! Your balance has been updated.
+                  </Alert>
+                ) : pollStatus === "failed" || pollStatus === "expired" ? (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    Payment {pollStatus}. Please try again or contact support.
+                  </Alert>
+                ) : (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">
+                      Checking payment status every 3s... ({pollStatus})
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             )}
             <Button
