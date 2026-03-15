@@ -7,9 +7,11 @@ import {
   AppBar, Toolbar, Box, Button, Typography, IconButton,
   Avatar, Menu, MenuItem, Chip, Divider,
   Drawer, List, ListItem, ListItemText, ListItemButton,
+  Badge, InputBase,
 } from "@mui/material"
 import MenuIcon from "@mui/icons-material/Menu"
 import WorkspacesIcon from "@mui/icons-material/Workspaces"
+import SearchIcon from "@mui/icons-material/Search"
 import { useAuth } from "@/lib/auth-context"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
 
@@ -17,12 +19,31 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [pendingTrades, setPendingTrades] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
+
+  // Poll for pending received trades every 30s
+  useEffect(() => {
+    if (!user) return
+    const fetchPending = async () => {
+      try {
+        const res = await fetch(`/api/trades?user_id=${user.id}`)
+        const data = await res.json()
+        if (data?.received) {
+          setPendingTrades(data.received.filter((t: any) => t.status === "pending").length)
+        }
+      } catch {}
+    }
+    fetchPending()
+    const interval = setInterval(fetchPending, 30000)
+    return () => clearInterval(interval)
+  }, [user])
 
   const handleUserMenu = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)
   const handleCloseMenu = () => setAnchorEl(null)
@@ -33,11 +54,13 @@ export default function Navbar() {
     router.push("/")
   }
 
-  const navLinks = [
-    { label: "Marketplace", href: "/marketplace" },
-    { label: "Trade", href: "/trade" },
-    { label: "Leaderboard", href: "/leaderboard" },
-  ]
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const q = searchQuery.trim()
+      router.push(q ? `/search?query=${encodeURIComponent(q)}` : "/search")
+      setSearchQuery("")
+    }
+  }
 
   return (
     <>
@@ -50,12 +73,12 @@ export default function Navbar() {
           color: "text.primary",
         }}
       >
-        <Toolbar sx={{ gap: 2, minHeight: { xs: 56, md: 64 } }}>
+        <Toolbar sx={{ gap: 1, minHeight: { xs: 56, md: 64 } }}>
           {/* Logo */}
           <Box
             component={NextLink}
             href="/"
-            sx={{ display: "flex", alignItems: "center", gap: 1, textDecoration: "none", mr: 2 }}
+            sx={{ display: "flex", alignItems: "center", gap: 1, textDecoration: "none", mr: 1 }}
           >
             <Box
               component="img"
@@ -71,46 +94,91 @@ export default function Navbar() {
             </Typography>
           </Box>
 
-          {/* Desktop nav — hidden on mobile via CSS, no JS media query */}
-          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1, flex: 1 }}>
-            {navLinks.map((link) => (
-              <Button
-                key={link.href}
-                component={NextLink}
-                href={link.href}
-                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-              >
-                {link.label}
-              </Button>
-            ))}
+          {/* Desktop nav links */}
+          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
+            <Button
+              component={NextLink}
+              href="/marketplace"
+              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+            >
+              Marketplace
+            </Button>
+            <Button
+              component={NextLink}
+              href="/trade"
+              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+            >
+              <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
+                <Box sx={{ pr: pendingTrades > 0 ? 1 : 0 }}>Trade</Box>
+              </Badge>
+            </Button>
+            <Button
+              component={NextLink}
+              href="/leaderboard"
+              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+            >
+              Leaderboard
+            </Button>
           </Box>
 
-          {/* Cases button — always visible */}
+          {/* Cases button */}
           <Button
             component={NextLink}
             href="/open"
             variant="contained"
             startIcon={<WorkspacesIcon />}
             size="small"
-            sx={{ fontWeight: 700, mr: 1 }}
+            sx={{ fontWeight: 700, ml: 0.5, flexShrink: 0 }}
           >
             Cases
           </Button>
 
-          <Box sx={{ flex: 1 }} />
+          {/* Search bar — centered, flex-grows */}
+          <Box
+            sx={{
+              flex: 1,
+              display: { xs: "none", md: "flex" },
+              justifyContent: "center",
+              px: 2,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                bgcolor: "#f0f7ff",
+                border: "1px solid #e3f2fd",
+                borderRadius: 2,
+                px: 1.5,
+                py: 0.5,
+                width: "100%",
+                maxWidth: 400,
+                gap: 1,
+              }}
+            >
+              <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+              <InputBase
+                placeholder="Search items, users, listings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
+                sx={{ flex: 1, fontSize: "0.875rem" }}
+              />
+            </Box>
+          </Box>
 
-          {/* Balance chip — only render after mount to avoid hydration mismatch */}
+          {/* Balance chip */}
           {mounted && user && (
             <Chip
               label={`$${Number(user.balance).toFixed(2)}`}
               color="primary"
               variant="outlined"
               onClick={() => setDepositOpen(true)}
-              sx={{ fontWeight: 700, cursor: "pointer", fontSize: "0.9rem" }}
+              sx={{ fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", flexShrink: 0 }}
             />
           )}
 
-          {/* User menu or login — only render after mount */}
+          {/* User menu or login */}
           {mounted && (
             user ? (
               <>
@@ -124,18 +192,10 @@ export default function Navbar() {
                   )}
                 </IconButton>
                 <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
-                  <MenuItem
-                    component={NextLink}
-                    href={`/user/${user.username}`}
-                    onClick={handleCloseMenu}
-                  >
+                  <MenuItem component={NextLink} href={`/user/${user.username}`} onClick={handleCloseMenu}>
                     My Inventory
                   </MenuItem>
-                  <MenuItem
-                    component={NextLink}
-                    href="/settings"
-                    onClick={handleCloseMenu}
-                  >
+                  <MenuItem component={NextLink} href="/settings" onClick={handleCloseMenu}>
                     Settings
                   </MenuItem>
                   {user.admin && (
@@ -144,38 +204,24 @@ export default function Navbar() {
                     </MenuItem>
                   )}
                   <Divider />
-                  <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
-                    Logout
-                  </MenuItem>
+                  <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>Logout</MenuItem>
                 </Menu>
               </>
             ) : (
               <Box sx={{ display: "flex", gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  component={NextLink}
-                  href="/login"
-                >
-                  Login
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  component={NextLink}
-                  href="/register"
-                  sx={{ display: { xs: "none", sm: "flex" } }}
-                >
+                <Button variant="outlined" size="small" component={NextLink} href="/login">Login</Button>
+                <Button variant="contained" size="small" component={NextLink} href="/register"
+                  sx={{ display: { xs: "none", sm: "flex" } }}>
                   Register
                 </Button>
               </Box>
             )
           )}
 
-          {/* Mobile hamburger — CSS-hidden on desktop */}
+          {/* Mobile hamburger */}
           <IconButton
             onClick={() => setMobileOpen(true)}
-            sx={{ ml: 1, display: { xs: "flex", md: "none" } }}
+            sx={{ ml: 0.5, display: { xs: "flex", md: "none" } }}
           >
             <MenuIcon />
           </IconButton>
@@ -184,47 +230,72 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={() => setMobileOpen(false)}>
-        <Box sx={{ width: 240 }}>
+        <Box sx={{ width: 260 }}>
+          {/* Mobile search */}
+          <Box sx={{ p: 2 }}>
+            <Box
+              sx={{
+                display: "flex", alignItems: "center",
+                bgcolor: "#f0f7ff", border: "1px solid #e3f2fd",
+                borderRadius: 2, px: 1.5, py: 0.75, gap: 1,
+              }}
+            >
+              <SearchIcon sx={{ color: "text.secondary", fontSize: 18 }} />
+              <InputBase
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const q = searchQuery.trim()
+                    router.push(q ? `/search?query=${encodeURIComponent(q)}` : "/search")
+                    setSearchQuery("")
+                    setMobileOpen(false)
+                  }
+                }}
+                sx={{ flex: 1, fontSize: "0.875rem" }}
+              />
+            </Box>
+          </Box>
+          <Divider />
           <List>
-            {navLinks.map((link) => (
-              <ListItem key={link.href} disablePadding>
-                <ListItemButton
-                  component={NextLink}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <ListItemText primary={link.label} />
-                </ListItemButton>
-              </ListItem>
-            ))}
+            <ListItem disablePadding>
+              <ListItemButton component={NextLink} href="/marketplace" onClick={() => setMobileOpen(false)}>
+                <ListItemText primary="Marketplace" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={NextLink} href="/trade" onClick={() => setMobileOpen(false)}>
+                <ListItemText
+                  primary={
+                    <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
+                      <Box sx={{ pr: pendingTrades > 0 ? 1.5 : 0 }}>Trade</Box>
+                    </Badge>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={NextLink} href="/leaderboard" onClick={() => setMobileOpen(false)}>
+                <ListItemText primary="Leaderboard" />
+              </ListItemButton>
+            </ListItem>
             {mounted && user && (
               <>
                 <Divider />
                 <ListItem disablePadding>
-                  <ListItemButton
-                    component={NextLink}
-                    href={`/user/${user.username}`}
-                    onClick={() => setMobileOpen(false)}
-                  >
+                  <ListItemButton component={NextLink} href={`/user/${user.username}`} onClick={() => setMobileOpen(false)}>
                     <ListItemText primary="My Inventory" />
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
-                  <ListItemButton
-                    component={NextLink}
-                    href="/settings"
-                    onClick={() => setMobileOpen(false)}
-                  >
+                  <ListItemButton component={NextLink} href="/settings" onClick={() => setMobileOpen(false)}>
                     <ListItemText primary="Settings" />
                   </ListItemButton>
                 </ListItem>
                 {user.admin && (
                   <ListItem disablePadding>
-                    <ListItemButton
-                      component={NextLink}
-                      href="/admin"
-                      onClick={() => setMobileOpen(false)}
-                    >
+                    <ListItemButton component={NextLink} href="/admin" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Admin Panel" />
                     </ListItemButton>
                   </ListItem>

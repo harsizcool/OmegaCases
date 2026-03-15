@@ -23,6 +23,14 @@ const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 const MAX_LISTING_PRICE = 800
 const STORAGE_KEY = "omegacases_marketplace_filters"
 
+const RARITY_PRICE_CAPS: Record<string, number> = {
+  Common: 0.04,
+  Uncommon: 0.10,
+  Rare: 0.40,
+  Legendary: 2.00,
+  Omega: MAX_LISTING_PRICE,
+}
+
 // --- Persist helpers ---
 function loadFilters() {
   if (typeof window === "undefined") return null
@@ -172,7 +180,10 @@ export default function MarketplacePage() {
   const handleSell = async () => {
     if (!sellItem || !sellPrice || !user) return
     const price = parseFloat(sellPrice)
-    if (price > MAX_LISTING_PRICE) { setSellError(`Max listing price is $${MAX_LISTING_PRICE}`); return }
+    const rarity = sellItem.items?.rarity ?? "Omega"
+    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+    if (price > cap) { setSellError(`Max price for ${rarity} is $${cap.toFixed(2)}`); return }
+    if (price <= 0) { setSellError("Price must be greater than $0"); return }
     setSellLoading(true)
     setSellError("")
     try {
@@ -358,15 +369,21 @@ export default function MarketplacePage() {
               })()}
               {sellItem && (
                 <>
-                  <TextField
-                    label={`Your Price (USD, max $${MAX_LISTING_PRICE})`}
-                    type="number"
-                    value={sellPrice}
-                    onChange={(e) => setSellPrice(e.target.value)}
-                    inputProps={{ min: 0.01, max: MAX_LISTING_PRICE, step: 0.01 }}
-                    fullWidth
-                    autoFocus
-                  />
+                  {(() => {
+                    const rarity = sellItem.items?.rarity ?? "Omega"
+                    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+                    return (
+                      <TextField
+                        label={`Your Price (USD, max $${cap.toFixed(2)} for ${rarity})`}
+                        type="number"
+                        value={sellPrice}
+                        onChange={(e) => setSellPrice(e.target.value)}
+                        inputProps={{ min: 0.01, max: cap, step: 0.01 }}
+                        fullWidth
+                        autoFocus
+                      />
+                    )
+                  })()}
                   {sellError && <Alert severity="error">{sellError}</Alert>}
                 </>
               )}

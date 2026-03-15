@@ -2,17 +2,16 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
-  const supabase = await createClient()
+  const db = createClient()
 
-  // Get all users
-  const { data: users } = await supabase
+  const { data: users } = await db
     .from("users")
     .select("id, username, profile_picture")
 
   if (!users) return NextResponse.json([])
 
-  // Get all inventory with item RAP values
-  const { data: inventory } = await supabase
+  // Use the same join as the inventory API so RAP values are identical
+  const { data: inventory } = await db
     .from("inventory")
     .select("user_id, items(rap)")
 
@@ -21,8 +20,9 @@ export async function GET() {
 
   for (const inv of inventory || []) {
     const uid = inv.user_id
+    const rap = Number((inv.items as any)?.rap ?? 0)
     if (!rapMap[uid]) { rapMap[uid] = 0; countMap[uid] = 0 }
-    rapMap[uid] += Number((inv.items as any)?.rap || 0)
+    rapMap[uid] += rap
     countMap[uid]++
   }
 
@@ -31,7 +31,7 @@ export async function GET() {
       id: u.id,
       username: u.username,
       profile_picture: u.profile_picture,
-      rap: rapMap[u.id] || 0,
+      rap: Math.round((rapMap[u.id] || 0) * 100) / 100,
       itemCount: countMap[u.id] || 0,
     }))
     .sort((a, b) => b.rap - a.rap)

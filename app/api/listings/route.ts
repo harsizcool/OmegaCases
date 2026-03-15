@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 
 const MAX_LISTING_PRICE = 800
 
+export const RARITY_PRICE_CAPS: Record<string, number> = {
+  Common: 0.04,
+  Uncommon: 0.10,
+  Rare: 0.40,
+  Legendary: 2.00,
+  Omega: MAX_LISTING_PRICE,
+}
+
 // GET: All active listings (with optional filters), or single listing by ?id=
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -84,8 +92,13 @@ export async function POST(request: Request) {
 
   if (!inv) return NextResponse.json({ error: "Item not in your inventory" }, { status: 403 })
 
-  if (price > MAX_LISTING_PRICE) {
-    return NextResponse.json({ error: `Max listing price is $${MAX_LISTING_PRICE}` }, { status: 400 })
+  // Fetch item rarity to enforce per-rarity cap
+  const { data: itemData } = await db.from("items").select("rarity").eq("id", item_id).single()
+  const rarity = itemData?.rarity ?? "Omega"
+  const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+
+  if (price > cap) {
+    return NextResponse.json({ error: `Max listing price for ${rarity} items is $${cap.toFixed(2)}` }, { status: 400 })
   }
   if (price <= 0) {
     return NextResponse.json({ error: "Price must be greater than 0" }, { status: 400 })
