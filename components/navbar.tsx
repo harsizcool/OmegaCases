@@ -73,73 +73,75 @@ export default function Navbar() {
           color: "text.primary",
         }}
       >
-        <Toolbar sx={{ gap: 1, minHeight: { xs: 56, md: 64 } }}>
-          {/* Logo */}
-          <Box
-            component={NextLink}
-            href="/"
-            sx={{ display: "flex", alignItems: "center", gap: 1, textDecoration: "none", mr: 1 }}
-          >
+        <Toolbar sx={{ minHeight: { xs: 56, md: 64 }, px: { xs: 1, md: 2 }, display: "flex", alignItems: "center" }}>
+          {/* LEFT: logo + nav links + Cases */}
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
             <Box
-              component="img"
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
-              alt="OmegaCases"
-              sx={{ width: 36, height: 36 }}
-            />
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 700, color: "primary.main", display: { xs: "none", sm: "block" } }}
+              component={NextLink}
+              href="/"
+              sx={{ display: "flex", alignItems: "center", gap: 1, textDecoration: "none", mr: 1, flexShrink: 0 }}
             >
-              OmegaCases
-            </Typography>
+              <Box
+                component="img"
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
+                alt="OmegaCases"
+                sx={{ width: 36, height: 36 }}
+              />
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, color: "primary.main", display: { xs: "none", sm: "block" }, whiteSpace: "nowrap" }}
+              >
+                OmegaCases
+              </Typography>
+            </Box>
+
+            {/* Desktop nav links */}
+            <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5, flexShrink: 0 }}>
+              <Button
+                component={NextLink}
+                href="/marketplace"
+                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+              >
+                Marketplace
+              </Button>
+              <Button
+                component={NextLink}
+                href="/trade"
+                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+              >
+                <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
+                  <Box sx={{ pr: pendingTrades > 0 ? 1 : 0 }}>Trade</Box>
+                </Badge>
+              </Button>
+              <Button
+                component={NextLink}
+                href="/leaderboard"
+                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
+              >
+                Leaderboard
+              </Button>
+            </Box>
+
+            <Button
+              component={NextLink}
+              href="/open"
+              variant="contained"
+              startIcon={<WorkspacesIcon />}
+              size="small"
+              sx={{ fontWeight: 700, ml: 0.5, flexShrink: 0, display: { xs: "none", md: "flex" } }}
+            >
+              Cases
+            </Button>
           </Box>
 
-          {/* Desktop nav links */}
-          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
-            <Button
-              component={NextLink}
-              href="/marketplace"
-              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-            >
-              Marketplace
-            </Button>
-            <Button
-              component={NextLink}
-              href="/trade"
-              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-            >
-              <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
-                <Box sx={{ pr: pendingTrades > 0 ? 1 : 0 }}>Trade</Box>
-              </Badge>
-            </Button>
-            <Button
-              component={NextLink}
-              href="/leaderboard"
-              sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-            >
-              Leaderboard
-            </Button>
-          </Box>
-
-          {/* Cases button */}
-          <Button
-            component={NextLink}
-            href="/open"
-            variant="contained"
-            startIcon={<WorkspacesIcon />}
-            size="small"
-            sx={{ fontWeight: 700, ml: 0.5, flexShrink: 0 }}
-          >
-            Cases
-          </Button>
-
-          {/* Search bar — centered, flex-grows */}
+          {/* CENTER: search bar — always truly centered */}
           <Box
             sx={{
-              flex: 1,
               display: { xs: "none", md: "flex" },
               justifyContent: "center",
-              px: 2,
+              alignItems: "center",
+              flexShrink: 0,
+              width: 340,
             }}
           >
             <Box
@@ -152,7 +154,6 @@ export default function Navbar() {
                 px: 1.5,
                 py: 0.5,
                 width: "100%",
-                maxWidth: 400,
                 gap: 1,
               }}
             >
@@ -167,65 +168,67 @@ export default function Navbar() {
             </Box>
           </Box>
 
-          {/* Balance chip */}
-          {mounted && user && (
-            <Chip
-              label={`$${Number(user.balance).toFixed(2)}`}
-              color="primary"
-              variant="outlined"
-              onClick={() => setDepositOpen(true)}
-              sx={{ fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", flexShrink: 0 }}
-            />
-          )}
+          {/* RIGHT: balance + avatar + mobile hamburger */}
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, minWidth: 0 }}>
+            {/* Balance chip */}
+            {mounted && user && (
+              <Chip
+                label={`$${Number(user.balance).toFixed(2)}`}
+                color="primary"
+                variant="outlined"
+                onClick={() => setDepositOpen(true)}
+                sx={{ fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", flexShrink: 0 }}
+              />
+            )}
 
-          {/* User menu or login */}
-          {mounted && (
-            user ? (
-              <>
-                <IconButton onClick={handleUserMenu} size="small">
-                  {user.profile_picture ? (
-                    <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
-                  ) : (
-                    <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 16 }}>
-                      {user.username[0].toUpperCase()}
-                    </Avatar>
-                  )}
-                </IconButton>
-                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
-                  <MenuItem component={NextLink} href={`/user/${user.username}`} onClick={handleCloseMenu}>
-                    My Inventory
-                  </MenuItem>
-                  <MenuItem component={NextLink} href="/settings" onClick={handleCloseMenu}>
-                    Settings
-                  </MenuItem>
-                  {user.admin && (
-                    <MenuItem component={NextLink} href="/admin" onClick={handleCloseMenu}>
-                      Admin Panel
+            {/* User menu or login */}
+            {mounted && (
+              user ? (
+                <>
+                  <IconButton onClick={handleUserMenu} size="small" sx={{ flexShrink: 0 }}>
+                    {user.profile_picture ? (
+                      <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
+                    ) : (
+                      <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 16 }}>
+                        {user.username[0].toUpperCase()}
+                      </Avatar>
+                    )}
+                  </IconButton>
+                  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
+                    <MenuItem component={NextLink} href={`/user/${user.username}`} onClick={handleCloseMenu}>
+                      My Inventory
                     </MenuItem>
-                  )}
-                  <Divider />
-                  <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>Logout</MenuItem>
-                </Menu>
-              </>
-            ) : (
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button variant="outlined" size="small" component={NextLink} href="/login">Login</Button>
-                <Button variant="contained" size="small" component={NextLink} href="/register"
-                  sx={{ display: { xs: "none", sm: "flex" } }}>
-                  Register
-                </Button>
-              </Box>
-            )
-          )}
+                    <MenuItem component={NextLink} href="/settings" onClick={handleCloseMenu}>
+                      Settings
+                    </MenuItem>
+                    {user.admin && (
+                      <MenuItem component={NextLink} href="/admin" onClick={handleCloseMenu}>
+                        Admin Panel
+                      </MenuItem>
+                    )}
+                    <Divider />
+                    <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>Logout</MenuItem>
+                  </Menu>
+                </>
+              ) : (
+                <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                  <Button variant="outlined" size="small" component={NextLink} href="/login">Login</Button>
+                  <Button variant="contained" size="small" component={NextLink} href="/register"
+                    sx={{ display: { xs: "none", sm: "flex" } }}>
+                    Register
+                  </Button>
+                </Box>
+              )
+            )}
 
-          {/* Mobile hamburger */}
-          <IconButton
-            onClick={() => setMobileOpen(true)}
-            sx={{ ml: 0.5, display: { xs: "flex", md: "none" } }}
-          >
-            <MenuIcon />
-          </IconButton>
-        </Toolbar>
+            {/* Mobile hamburger */}
+            <IconButton
+              onClick={() => setMobileOpen(true)}
+              sx={{ display: { xs: "flex", md: "none" } }}
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
       </AppBar>
 
       {/* Mobile Drawer */}
