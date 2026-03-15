@@ -12,6 +12,8 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
 import type { Listing, Sale, Rarity } from "@/lib/types"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 
 // Single dynamic import for the whole chart — avoids Turbopack multi-chunk split errors
 const SalesPriceChart = dynamic(() => import("@/components/sales-price-chart"), { ssr: false })
