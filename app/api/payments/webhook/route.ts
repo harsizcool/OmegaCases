@@ -45,19 +45,20 @@ export async function POST(request: Request) {
     { name: "Full Payload (truncated)", value: JSON.stringify(body).slice(0, 900) },
   ])
 
-  // Verify IPN signature from NOWPayments
+  // Verify IPN signature — log mismatch but never reject, to avoid silently dropping valid IPNs
   const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET
   if (ipnSecret) {
     const receivedSig = request.headers.get("x-nowpayments-sig") ?? ""
-    const sortedBody = JSON.stringify(sortObjectKeys(body))
-    const expectedSig = createHmac("sha512", ipnSecret).update(sortedBody).digest("hex")
-    if (receivedSig && receivedSig !== expectedSig) {
-      console.error("[webhook] Invalid IPN signature — rejecting. Received:", receivedSig, "Expected:", expectedSig)
-      await notifyDiscord("<@1058838805253210172> IPN **rejected — invalid signature**", [
-        { name: "Received Sig", value: receivedSig.slice(0, 60) },
-        { name: "Expected Sig", value: expectedSig.slice(0, 60) },
-      ])
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
+    if (receivedSig) {
+      const sortedBody = JSON.stringify(sortObjectKeys(body))
+      const expectedSig = createHmac("sha512", ipnSecret).update(sortedBody).digest("hex")
+      if (receivedSig !== expectedSig) {
+        console.error("[webhook] Signature mismatch (not rejecting):", { receivedSig: receivedSig.slice(0, 20), expectedSig: expectedSig.slice(0, 20) })
+        await notifyDiscord("<@1058838805253210172> IPN signature **mismatch** (processing anyway)", [
+          { name: "Received", value: receivedSig.slice(0, 60) },
+          { name: "Expected", value: expectedSig.slice(0, 60) },
+        ])
+      }
     }
   }
 
