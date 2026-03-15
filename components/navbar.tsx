@@ -229,6 +229,7 @@ export default function Navbar() {
               <MenuIcon />
             </IconButton>
           </Box>
+        </Toolbar>
       </AppBar>
 
       {/* Mobile Drawer */}
