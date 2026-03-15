@@ -92,8 +92,8 @@ export const RARITY_GLOW: Record<Rarity, string> = {
 }
 
 export const CASE_PRICES = [
-  { qty: 10, price: 0.19 },
-  { qty: 100, price: 0.79 },
+  { qty: 10, price: 0.29 },
+  { qty: 100, price: 1.99 },
   { qty: 1000, price: 7.99 },
 ]
 
