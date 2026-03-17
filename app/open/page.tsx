@@ -17,6 +17,7 @@ import ItemCard from "@/components/item-card"
 import type { Item, Rarity, CasePrice } from "@/lib/types"
 import { RARITY_COLORS, CASE_PRICES } from "@/lib/types"
 import NextLink from "next/link"
+import { useMuteSounds } from "@/app/settings/page"
 
 const CONFETTI_RARITIES: Rarity[] = ["Legendary", "Omega"]
 const CONFETTI_SRC = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/confetti-pop-sound-fNcAXWXi7MdyVXwS9yqsN7dqp9PhVx.mp3"
@@ -32,6 +33,7 @@ function playSound(src: string) {
 
 export default function OpenPage() {
   const { user, refreshUser } = useAuth()
+  const { muted } = useMuteSounds()
   const [items, setItems] = useState<Item[]>([])
   const [casePrices, setCasePrices] = useState<CasePrice[]>(CASE_PRICES)
   const [selectedQty, setSelectedQty] = useState<number>(10)
@@ -114,6 +116,7 @@ export default function OpenPage() {
       if (!res.ok) throw new Error(data.error || "Failed to open case")
       setTargetItem(data.wonItem)
       await refreshUser()
+      window.dispatchEvent(new CustomEvent("spin-start"))
       setSpinning(true)
     } catch (e: any) {
       setError(e.message)
@@ -128,15 +131,20 @@ export default function OpenPage() {
     setShowResult(true)
     setSpinning(false)
 
+    // Notify live rolls feed that animation is done — safe to show the new roll
+    window.dispatchEvent(new CustomEvent("roll-complete"))
+
     if (CONFETTI_RARITIES.includes(targetItem.rarity as Rarity)) {
       setConfettiActive(true)
-      playSound(CONFETTI_SRC)
-      playSound(BORING_SRC)
+      if (!muted) {
+        playSound(CONFETTI_SRC)
+        playSound(BORING_SRC)
+      }
       setTimeout(() => setConfettiActive(false), 6000)
     } else {
-      playSound(BORING_SRC)
+      if (!muted) playSound(BORING_SRC)
     }
-  }, [targetItem])
+  }, [targetItem, muted])
 
   const handleSpinAgain = () => {
     setShowResult(false)
@@ -207,6 +215,7 @@ export default function OpenPage() {
                 spinning={spinning}
                 onComplete={handleSpinComplete}
                 speed={doubleSpeed ? 2 : 1}
+                muted={muted}
               />
             </Box>
           )}

@@ -26,6 +26,7 @@ interface Props {
   onComplete: () => void
   spinning: boolean
   speed?: number  // 1 = normal, 2 = 2x
+  muted?: boolean
 }
 
 function playTick() {
@@ -36,7 +37,7 @@ function playTick() {
   } catch {}
 }
 
-export default function CaseSpinner({ items, targetItem, onComplete, spinning, speed = 1 }: Props) {
+export default function CaseSpinner({ items, targetItem, onComplete, spinning, speed = 1, muted = false }: Props) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
 
@@ -88,7 +89,7 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
       const currentIndex = Math.floor(offset / totalItem)
       if (currentIndex !== lastTickIndexRef.current && t < 0.95) {
         lastTickIndexRef.current = currentIndex
-        playTick()
+        if (!muted) playTick()
       }
 
       if (t < 1) {
