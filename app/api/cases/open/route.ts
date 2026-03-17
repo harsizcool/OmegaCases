@@ -59,8 +59,9 @@ export async function POST(request: Request) {
 
   if (invError) return NextResponse.json({ error: invError.message }, { status: 500 })
 
-  // Record roll in rolls table for live feed
-  await supabase.from("rolls").insert({ user_id, item_id: wonItemId })
+  // NOTE: rolls table insert is intentionally NOT done here.
+  // It is done client-side AFTER the spin animation ends, so the live feed
+  // never reveals the result before the roller sees it.
 
   // Set first_unboxed_by if this item has never been unboxed before
   await supabase

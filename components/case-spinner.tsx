@@ -47,62 +47,73 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
   const maxWidth = isMobile ? MAX_SPINNER_WIDTH_MOBILE : MAX_SPINNER_WIDTH
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   const animFrameRef = useRef<number>(0)
-  const startTimeRef = useRef<number>(0)
   const lastTickIndexRef = useRef<number>(-1)
-  const [currentOffset, setCurrentOffset] = useState(0)
 
-  // Shorter strip on mobile to reduce DOM nodes
+  // Strip items stored in ref — no re-render needed when they change
   const stripLength = isMobile ? 40 : 60
   const targetPos = isMobile ? 32 : 52
-
-  const stripItems = useRef<Item[]>([])
-  const targetIndexRef = useRef(0)
+  const [stripItems, setStripItems] = useState<Item[]>([])
 
   useEffect(() => {
     if (!spinning || items.length === 0) return
 
+    // Build strip synchronously before starting animation
     const strip: Item[] = []
     for (let i = 0; i < stripLength; i++) {
       strip.push(i === targetPos ? targetItem : items[Math.floor(Math.random() * items.length)])
     }
-    stripItems.current = strip
-    targetIndexRef.current = targetPos
+    setStripItems(strip)
 
-    const containerWidth = containerRef.current?.offsetWidth ?? maxWidth
-    const centerOffset = Math.floor(containerWidth / 2)
-    const finalOffset = targetPos * totalItem - centerOffset + itemW / 2
-    const startOffset = 0
-    const distance = finalOffset - startOffset
-    const duration = 5000 / speed  // halve duration for 2x speed
+    // Wait one frame for React to render the strip, then start animating
+    const raf = requestAnimationFrame(() => {
+      const containerWidth = containerRef.current?.offsetWidth ?? maxWidth
+      const centerOffset = Math.floor(containerWidth / 2)
+      const finalOffset = targetPos * totalItem - centerOffset + itemW / 2
+      const startOffset = 0
+      const distance = finalOffset - startOffset
+      const duration = 5000 / speed
 
-    startTimeRef.current = performance.now()
-    lastTickIndexRef.current = -1
+      const startTime = performance.now()
+      lastTickIndexRef.current = -1
 
-    const animate = (now: number) => {
-      const elapsed = now - startTimeRef.current
-      const t = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3)
-      const offset = startOffset + distance * eased
-      setCurrentOffset(offset)
+      const animate = (now: number) => {
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        // Cubic ease-out
+        const eased = 1 - Math.pow(1 - t, 3)
+        const offset = startOffset + distance * eased
 
-      const currentIndex = Math.floor(offset / totalItem)
-      if (currentIndex !== lastTickIndexRef.current && t < 0.95) {
-        lastTickIndexRef.current = currentIndex
-        if (!muted) playTick()
+        // Directly mutate DOM — zero React overhead
+        if (trackRef.current) {
+          trackRef.current.style.transform = `translateX(-${offset}px)`
+        }
+
+        const currentIndex = Math.floor(offset / totalItem)
+        if (currentIndex !== lastTickIndexRef.current && t < 0.95) {
+          lastTickIndexRef.current = currentIndex
+          if (!muted) playTick()
+        }
+
+        if (t < 1) {
+          animFrameRef.current = requestAnimationFrame(animate)
+        } else {
+          if (trackRef.current) {
+            trackRef.current.style.transform = `translateX(-${finalOffset}px)`
+          }
+          onComplete()
+        }
       }
 
-      if (t < 1) {
-        animFrameRef.current = requestAnimationFrame(animate)
-      } else {
-        setCurrentOffset(finalOffset)
-        onComplete()
-      }
+      animFrameRef.current = requestAnimationFrame(animate)
+    })
+
+    return () => {
+      cancelAnimationFrame(raf)
+      cancelAnimationFrame(animFrameRef.current)
     }
-
-    animFrameRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animFrameRef.current)
-  }, [spinning, targetItem, items, onComplete, speed, totalItem, itemW, stripLength, targetPos, maxWidth])
+  }, [spinning, targetItem, items, onComplete, speed, totalItem, itemW, stripLength, targetPos, maxWidth, muted])
 
   return (
     <Box
@@ -137,18 +148,18 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
       <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to right, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
       <Box sx={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to left, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
 
-      {/* Track — use CSS transform only, no layout triggers */}
+      {/* Track — driven by direct DOM style, not React state */}
       <Box
+        ref={trackRef}
         sx={{
           display: "flex",
           gap: `${itemGap}px`,
-          transform: `translateX(-${currentOffset}px)`,
           willChange: "transform",
           py: 1,
           px: "4px",
         }}
       >
-        {stripItems.current.map((item, i) => {
+        {stripItems.map((item, i) => {
           const color = RARITY_COLORS[item.rarity as Rarity]
           const glow = RARITY_GLOW[item.rarity as Rarity]
           return (

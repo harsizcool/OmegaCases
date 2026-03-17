@@ -39,6 +39,7 @@ export default function OpenPage() {
   const [selectedQty, setSelectedQty] = useState<number>(10)
   const [spinning, setSpinning] = useState(false)
   const [targetItem, setTargetItem] = useState<Item | null>(null)
+  const [wonItemId, setWonItemId] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [lastWon, setLastWon] = useState<Item | null>(null)
   const [confettiActive, setConfettiActive] = useState(false)
@@ -115,8 +116,8 @@ export default function OpenPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to open case")
       setTargetItem(data.wonItem)
+      setWonItemId(data.wonItem.id)
       await refreshUser()
-      window.dispatchEvent(new CustomEvent("spin-start"))
       setSpinning(true)
     } catch (e: any) {
       setError(e.message)
@@ -131,8 +132,15 @@ export default function OpenPage() {
     setShowResult(true)
     setSpinning(false)
 
-    // Notify live rolls feed that animation is done — safe to show the new roll
-    window.dispatchEvent(new CustomEvent("roll-complete"))
+    // Record roll AFTER animation — this triggers Realtime so live feed shows
+    // the result only after the roller has already seen it
+    if (user?.id && wonItemId) {
+      fetch("/api/rolls/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, item_id: wonItemId }),
+      }).catch(() => {})
+    }
 
     if (CONFETTI_RARITIES.includes(targetItem.rarity as Rarity)) {
       setConfettiActive(true)
@@ -144,7 +152,7 @@ export default function OpenPage() {
     } else {
       if (!muted) playSound(BORING_SRC)
     }
-  }, [targetItem, muted])
+  }, [targetItem, wonItemId, user?.id, muted])
 
   const handleSpinAgain = () => {
     setShowResult(false)

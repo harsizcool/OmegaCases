@@ -31,9 +31,6 @@ export default function LiveRollsFeed() {
   const [connected, setConnected] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const seenIds = useRef<Set<string>>(new Set())
-  // Buffer holds new rolls from Realtime that came in while a spin animation is playing
-  const pendingBuffer = useRef<Roll[]>([])
-  const isSpinning = useRef(false)
 
   // Initial load via server API (single joined query)
   useEffect(() => {
@@ -46,24 +43,6 @@ export default function LiveRollsFeed() {
         }
       })
       .catch(() => {})
-  }, [])
-
-  // Listen for spin start (gate new rolls) and spin complete (flush buffer)
-  useEffect(() => {
-    const onSpinStart = () => { isSpinning.current = true }
-    const onRollComplete = () => {
-      isSpinning.current = false
-      if (pendingBuffer.current.length > 0) {
-        setRolls((prev) => [...prev, ...pendingBuffer.current].slice(-MAX_ROLLS))
-        pendingBuffer.current = []
-      }
-    }
-    window.addEventListener("spin-start", onSpinStart)
-    window.addEventListener("roll-complete", onRollComplete)
-    return () => {
-      window.removeEventListener("spin-start", onSpinStart)
-      window.removeEventListener("roll-complete", onRollComplete)
-    }
   }, [])
 
   // Realtime subscription for new inserts
@@ -98,12 +77,8 @@ export default function LiveRollsFeed() {
             rap: itemRes.data?.rap ?? 0,
           }
 
-          if (isSpinning.current) {
-            // Buffer it — show after spin completes so viewers don't see the result before the roller
-            pendingBuffer.current = [...pendingBuffer.current, enriched].slice(-MAX_ROLLS)
-          } else {
-            setRolls((prev) => [...prev, enriched].slice(-MAX_ROLLS))
-          }
+          seenIds.current.add(enriched.id)
+          setRolls((prev) => [...prev, enriched].slice(-MAX_ROLLS))
         }
       )
       .subscribe((status) => {
