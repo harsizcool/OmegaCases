@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/auth-context"
 import CaseSpinner from "@/components/case-spinner"
 import Confetti from "@/components/confetti"
 import ItemCard from "@/components/item-card"
-import type { Item, Rarity } from "@/lib/types"
+import type { Item, Rarity, CasePrice } from "@/lib/types"
 import { RARITY_COLORS, CASE_PRICES } from "@/lib/types"
 import NextLink from "next/link"
 
@@ -33,6 +33,7 @@ function playSound(src: string) {
 export default function OpenPage() {
   const { user, refreshUser } = useAuth()
   const [items, setItems] = useState<Item[]>([])
+  const [casePrices, setCasePrices] = useState<CasePrice[]>(CASE_PRICES)
   const [selectedQty, setSelectedQty] = useState<number>(10)
   const [spinning, setSpinning] = useState(false)
   const [targetItem, setTargetItem] = useState<Item | null>(null)
@@ -61,9 +62,12 @@ export default function OpenPage() {
 
   useEffect(() => {
     fetch("/api/admin/items").then((r) => r.json()).then(setItems)
+    fetch("/api/cases/prices").then((r) => r.json()).then((prices) => {
+      if (Array.isArray(prices) && prices.length > 0) setCasePrices(prices)
+    })
   }, [])
 
-  const selectedPrice = CASE_PRICES.find((p) => p.qty === selectedQty)!
+  const selectedPrice = casePrices.find((p) => p.qty === selectedQty) ?? casePrices[0]
   const casesRemaining = user?.cases_remaining ?? 0
 
   // Buy cases: deduct balance, add to cases_remaining only
@@ -304,7 +308,7 @@ export default function OpenPage() {
           </Typography>
 
           <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
-            {CASE_PRICES.map((preset) => (
+            {casePrices.map((preset) => (
               <Card
                 key={preset.qty}
                 onClick={() => !buyLoading && setSelectedQty(preset.qty)}

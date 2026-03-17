@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import MuiProvider from '@/components/mui-provider'
 import Navbar from '@/components/navbar'
+import LiveRollsFeed from '@/components/live-rolls-feed'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -28,7 +29,10 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <MuiProvider>
           <Navbar />
-          <main>{children}</main>
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
+            <LiveRollsFeed />
+          </div>
         </MuiProvider>
         <Analytics />
       </body>

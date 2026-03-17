@@ -91,7 +91,9 @@ export const RARITY_GLOW: Record<Rarity, string> = {
   Omega: "0 0 24px #f4433688",
 }
 
-export const CASE_PRICES = [
+export type CasePrice = { qty: number; price: number }
+
+export const CASE_PRICES: CasePrice[] = [
   { qty: 10, price: 0.39 },
   { qty: 100, price: 2.99 },
   { qty: 1000, price: 9.99 },

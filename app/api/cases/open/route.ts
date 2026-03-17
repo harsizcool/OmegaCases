@@ -56,6 +56,9 @@ export async function POST(request: Request) {
 
   if (invError) return NextResponse.json({ error: invError.message }, { status: 500 })
 
+  // Record roll in rolls table for live feed
+  await supabase.from("rolls").insert({ user_id, item_id: wonItemId })
+
   // Set first_unboxed_by if this item has never been unboxed before
   await supabase
     .from("items")
