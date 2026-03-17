@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import dynamic from "next/dynamic"
 import {
   Container, Box, Typography, Chip, CircularProgress, Alert,
-  Grid, Card, Avatar, Button, Paper,
+  Grid, Card, Avatar, Button, Paper, Tooltip,
 } from "@mui/material"
 import type { Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
