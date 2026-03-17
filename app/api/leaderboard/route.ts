@@ -12,14 +12,14 @@ export async function GET() {
 
   if (!users) return NextResponse.json([])
 
-  // Fetch ALL inventory rows across all users in pages to bypass Supabase's 1000-row default limit
-  let allInventory: { user_id: string; items: { rap: number } | null }[] = []
+  // Fetch ALL inventory rows — only Legendary and Omega count toward value
+  let allInventory: { user_id: string; items: { rap: number; rarity: string } | null }[] = []
   let from = 0
   const pageSize = 1000
   while (true) {
     const { data: page, error } = await db
       .from("inventory")
-      .select("user_id, items(rap)")
+      .select("user_id, items(rap, rarity)")
       .range(from, from + pageSize - 1)
     if (error || !page || page.length === 0) break
     allInventory = allInventory.concat(page as any)
@@ -27,12 +27,14 @@ export async function GET() {
     from += pageSize
   }
 
+  const VALUE_RARITIES = ["Legendary", "Omega"]
   const rapMap: Record<string, number> = {}
   const countMap: Record<string, number> = {}
 
   for (const inv of allInventory) {
     const uid = inv.user_id
-    const rap = Number((inv.items as any)?.rap ?? 0)
+    const rarity = (inv.items as any)?.rarity ?? ""
+    const rap = VALUE_RARITIES.includes(rarity) ? Number((inv.items as any)?.rap ?? 0) : 0
     if (!rapMap[uid]) { rapMap[uid] = 0; countMap[uid] = 0 }
     rapMap[uid] += rap
     countMap[uid]++

@@ -92,9 +92,12 @@ export const RARITY_GLOW: Record<Rarity, string> = {
 }
 
 export const CASE_PRICES = [
-  { qty: 10, price: 0.29 },
-  { qty: 100, price: 1.99 },
-  { qty: 1000, price: 7.99 },
+  { qty: 10, price: 0.39 },
+  { qty: 100, price: 2.99 },
+  { qty: 1000, price: 9.99 },
 ]
+
+// Only these rarities count toward inventory value
+export const VALUE_RARITIES: Rarity[] = ["Legendary", "Omega"]
 
 export const ACCEPTED_CRYPTOS = ["BTC", "LTC", "SOL", "BCH"]

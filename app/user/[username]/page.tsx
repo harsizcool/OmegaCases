@@ -11,7 +11,7 @@ import {
 } from "@mui/material"
 import { useAuth } from "@/lib/auth-context"
 import type { InventoryItem, Rarity } from "@/lib/types"
-import { RARITY_COLORS } from "@/lib/types"
+import { RARITY_COLORS, VALUE_RARITIES } from "@/lib/types"
 import NextLink from "next/link"
 
 type SortMode = "rap" | "latest"
@@ -67,7 +67,10 @@ export default function UserPage() {
     load()
   }, [username, page])
 
-  const rapValue = inventory.reduce((sum, inv) => sum + Number(inv.items?.rap || 0), 0)
+  // Only Legendary and Omega items count toward inventory value
+  const rapValue = inventory
+    .filter((inv) => VALUE_RARITIES.includes(inv.items?.rarity as Rarity))
+    .reduce((sum, inv) => sum + Number(inv.items?.rap || 0), 0)
   const isMe = me?.username === username
 
   // Build bundled view
