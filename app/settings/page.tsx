@@ -1,19 +1,25 @@
 "use client"
-// v2 - single export
+// v3 - dark mode + Plus badge
 import { useState, useRef, useEffect } from "react"
 import {
   Box, Container, Typography, Paper, Avatar, Button,
   TextField, Divider, Alert, Chip, CircularProgress,
-  Stack, Switch, FormControlLabel,
+  Stack, Switch, FormControlLabel, Tooltip,
 } from "@mui/material"
 import CameraAltIcon from "@mui/icons-material/CameraAlt"
 import PersonIcon from "@mui/icons-material/Person"
 import SettingsIcon from "@mui/icons-material/Settings"
 import VolumeOffIcon from "@mui/icons-material/VolumeOff"
 import VolumeUpIcon from "@mui/icons-material/VolumeUp"
+import DarkModeIcon from "@mui/icons-material/DarkMode"
+import LightModeIcon from "@mui/icons-material/LightMode"
+import LockIcon from "@mui/icons-material/Lock"
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
+import NextLink from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useMuteSounds } from "@/lib/use-mute-sounds"
+import { useThemeMode } from "@/components/mui-provider"
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth()
@@ -28,6 +34,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("")
   const [error, setError] = useState("")
   const { muted, toggle: toggleMute } = useMuteSounds()
+  const { mode, toggleMode } = useThemeMode()
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => { if (user) setUsername(user.username) }, [user])
@@ -105,6 +112,14 @@ export default function SettingsPage() {
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h6" fontWeight={600}>{user.username}</Typography>
             <Typography variant="body2" color="text.secondary">{user.admin ? "Administrator" : "Member"}</Typography>
+            {user.plus && (
+              <Chip
+                icon={<WorkspacePremiumIcon sx={{ fontSize: "1rem !important", color: "#f59e0b !important" }} />}
+                label="OmegaCases Plus"
+                size="small"
+                sx={{ mt: 0.75, bgcolor: "#fffbeb", border: "1px solid #f59e0b", color: "#d97706", fontWeight: 700 }}
+              />
+            )}
           </Box>
           <Stack direction="row" spacing={1}>
             <Chip label={`$${Number(user.balance).toFixed(2)} balance`} color="primary" variant="outlined" size="small" />
@@ -173,7 +188,50 @@ export default function SettingsPage() {
 
             <Divider />
 
-            <Button variant="contained" size="large" onClick={handleSave} disabled={saving} sx={{ fontWeight: 700, display: "flex", gap: 1, alignItems: "center" }}>
+            {/* Dark mode — Plus only */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                {mode === "dark"
+                  ? <DarkModeIcon fontSize="small" sx={{ color: "#f59e0b" }} />
+                  : <LightModeIcon fontSize="small" sx={{ color: "primary.main" }} />
+                }
+                Theme
+                {!user.plus && <LockIcon fontSize="small" sx={{ ml: 0.5, color: "text.disabled", fontSize: "0.8rem" }} />}
+              </Typography>
+              <Tooltip
+                title={!user.plus ? "OmegaCases Plus required to unlock dark mode" : ""}
+                placement="top"
+                arrow
+              >
+                <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2, opacity: user.plus ? 1 : 0.55 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={mode === "dark"}
+                        onChange={toggleMode}
+                        disabled={!user.plus}
+                        color="warning"
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>Dark Mode</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {user.plus
+                            ? "Switch the entire site to a dark theme"
+                            : <>Unlock with <Box component={NextLink} href="/plus" sx={{ color: "#f59e0b", fontWeight: 700 }}>OmegaCases Plus</Box></>
+                          }
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ m: 0, width: "100%" }}
+                    labelPlacement="start"
+                  />
+                </Paper>
+              </Tooltip>
+            </Box>
+
+            <Divider /> variant="contained" size="large" onClick={handleSave} disabled={saving} sx={{ fontWeight: 700, display: "flex", gap: 1, alignItems: "center" }}>
               {saving && <CircularProgress size={16} sx={{ color: "inherit" }} />}
               {saving ? "Saving..." : "Save Changes"}
             </Button>
