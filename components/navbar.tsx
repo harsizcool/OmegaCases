@@ -12,11 +12,16 @@ import {
 import MenuIcon from "@mui/icons-material/Menu"
 import WorkspacesIcon from "@mui/icons-material/Workspaces"
 import SearchIcon from "@mui/icons-material/Search"
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
+import DarkModeIcon from "@mui/icons-material/DarkMode"
+import LightModeIcon from "@mui/icons-material/LightMode"
 import { useAuth } from "@/lib/auth-context"
+import { useThemeMode } from "./mui-provider"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
 
 export default function Navbar() {
   const { user, logout } = useAuth()
+  const { mode, toggleMode } = useThemeMode()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [pendingTrades, setPendingTrades] = useState(0)
@@ -120,6 +125,14 @@ export default function Navbar() {
               >
                 Leaderboard
               </Button>
+              <Button
+                component={NextLink}
+                href="/plus"
+                startIcon={<WorkspacePremiumIcon sx={{ color: "#f59e0b" }} />}
+                sx={{ color: "#f59e0b", fontWeight: 700, "&:hover": { bgcolor: "#fffbeb" } }}
+              >
+                Plus
+              </Button>
             </Box>
 
             <Button
@@ -185,6 +198,14 @@ export default function Navbar() {
             {mounted && (
               user ? (
                 <>
+                  {user.plus && (
+                    <IconButton onClick={toggleMode} size="small" title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                      {mode === "dark"
+                        ? <LightModeIcon sx={{ fontSize: 20, color: "#f59e0b" }} />
+                        : <DarkModeIcon sx={{ fontSize: 20, color: "#546e7a" }} />
+                      }
+                    </IconButton>
+                  )}
                   <IconButton onClick={handleUserMenu} size="small" sx={{ flexShrink: 0 }}>
                     {user.profile_picture ? (
                       <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
@@ -282,6 +303,18 @@ export default function Navbar() {
             <ListItem disablePadding>
               <ListItemButton component={NextLink} href="/leaderboard" onClick={() => setMobileOpen(false)}>
                 <ListItemText primary="Leaderboard" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={NextLink} href="/plus" onClick={() => setMobileOpen(false)}>
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <WorkspacePremiumIcon sx={{ fontSize: 18, color: "#f59e0b" }} />
+                      <Typography fontWeight={700} sx={{ color: "#f59e0b" }}>Plus</Typography>
+                    </Box>
+                  }
+                />
               </ListItemButton>
             </ListItem>
             {mounted && user && (

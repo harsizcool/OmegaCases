@@ -1,7 +1,16 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requirePlusUser } from "@/lib/require-plus"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Require Plus auth for external/API-doc access when user_id param is provided.
+  // If called without user_id it's an internal live-feed call — allow it (used server-side for the rolls feed).
+  const userId = req.nextUrl.searchParams.get("user_id")
+  if (userId !== null) {
+    const auth = await requirePlusUser(userId)
+    if (auth.error) return auth.error
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase

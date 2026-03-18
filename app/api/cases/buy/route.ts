@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getCasePrices } from "@/lib/game-settings"
 
 export async function POST(request: Request) {
   const { user_id, qty } = await request.json()
@@ -8,12 +9,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 })
   }
 
-  const validQtys: Record<number, number> = { 10: 0.19, 100: 0.79, 1000: 7.99 }
-  if (!validQtys[qty]) {
+  // Load prices from the same source the UI uses (game_settings or fallback)
+  const casePrices = await getCasePrices()
+  const priceEntry = casePrices.find((p) => p.qty === qty)
+  if (!priceEntry) {
     return NextResponse.json({ error: "Invalid quantity" }, { status: 400 })
   }
 
-  const cost = validQtys[qty]
+  const cost = priceEntry.price
   const supabase = await createClient()
 
   const { data: user } = await supabase

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requirePlusUser } from "@/lib/require-plus"
 
 const PAGE_SIZE = 1000
 
@@ -9,6 +10,14 @@ export async function GET(
 ) {
   const { userId } = await params
   const { searchParams } = new URL(request.url)
+
+  // If a user_id param is passed (API docs external call), enforce Plus auth
+  const apiUserId = searchParams.get("user_id")
+  if (apiUserId !== null) {
+    const auth = await requirePlusUser(apiUserId)
+    if (auth.error) return auth.error
+  }
+
   const page = Math.max(0, parseInt(searchParams.get("page") || "0", 10))
   const supabase = await createClient()
 

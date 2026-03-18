@@ -1,17 +1,19 @@
 "use client"
-// v2
+// v3 — Plus withdraw methods
 import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Tabs, Tab, Box, Typography,
   MenuItem, Select, FormControl, InputLabel, CircularProgress,
-  Alert, Divider, Chip, ToggleButton, ToggleButtonGroup,
+  Alert, Divider, Chip, ToggleButton, ToggleButtonGroup, Tooltip,
 } from "@mui/material"
 import Link from "next/link"
+import LockIcon from "@mui/icons-material/Lock"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import QrCode2Icon from "@mui/icons-material/QrCode2"
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard"
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
 import { useAuth } from "@/lib/auth-context"
 import { ACCEPTED_CRYPTOS } from "@/lib/types"
 
@@ -48,7 +50,28 @@ interface Props {
 export default function DepositWithdrawModal({ open, onClose }: Props) {
   const { user, refreshUser } = useAuth()
   const [tab, setTab] = useState(0)
-  const [withdrawMode, setWithdrawMode] = useState<"crypto" | "giftcard">("crypto")
+  const [withdrawMode, setWithdrawMode] = useState<"crypto" | "giftcard" | "paypal" | "xbox" | "playstation">("crypto")
+
+  // PayPal withdraw state
+  const [ppEmail, setPpEmail] = useState("")
+  const [ppAmount, setPpAmount] = useState("")
+  const [ppLoading, setPpLoading] = useState(false)
+  const [ppSuccess, setPpSuccess] = useState(false)
+  const [ppError, setPpError] = useState("")
+
+  // Xbox withdraw state
+  const [xboxEmail, setXboxEmail] = useState("")
+  const [xboxAmount, setXboxAmount] = useState<25 | 50>(25)
+  const [xboxLoading, setXboxLoading] = useState(false)
+  const [xboxSuccess, setXboxSuccess] = useState(false)
+  const [xboxError, setXboxError] = useState("")
+
+  // PlayStation withdraw state
+  const [psEmail, setPsEmail] = useState("")
+  const [psAmount, setPsAmount] = useState<25 | 50>(25)
+  const [psLoading, setPsLoading] = useState(false)
+  const [psSuccess, setPsSuccess] = useState(false)
+  const [psError, setPsError] = useState("")
 
   // Deposit state
   const [depositAmount, setDepositAmount] = useState("")
@@ -172,6 +195,46 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
     }
   }
 
+  const handlePayPal = async () => {
+    setPpError(""); setPpSuccess(false)
+    if (!ppEmail.includes("@")) { setPpError("Enter a valid PayPal email"); return }
+    if (Number(ppAmount) < 10) { setPpError("Minimum PayPal withdrawal is $10.00"); return }
+    if (Number(user?.balance) < Number(ppAmount)) { setPpError("Insufficient balance"); return }
+    setPpLoading(true)
+    try {
+      const res = await fetch("/api/payments/withdraw-plus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user!.id, method: "paypal", amount: Number(ppAmount), email: ppEmail.trim() }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed")
+      setPpSuccess(true); await refreshUser()
+    } catch (e: any) { setPpError(e.message) } finally { setPpLoading(false) }
+  }
+
+  const handleXbox = async () => {
+    setXboxError(""); setXboxSuccess(false)
+    if (!xboxEmail.includes("@")) { setXboxError("Enter a valid email"); return }
+    if (Number(user?.balance) < xboxAmount) { setXboxError("Insufficient balance"); return }
+    setXboxLoading(true)
+    try {
+      const res = await fetch("/api/payments/withdraw-plus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user!.id, method: "xbox", amount: xboxAmount, email: xboxEmail.trim() }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed")
+      setXboxSuccess(true); await refreshUser()
+    } catch (e: any) { setXboxError(e.message) } finally { setXboxLoading(false) }
+  }
+
+  const handlePlayStation = async () => {
+    setPsError(""); setPsSuccess(false)
+    if (!psEmail.includes("@")) { setPsError("Enter a valid email"); return }
+    if (Number(user?.balance) < psAmount) { setPsError("Insufficient balance"); return }
+    setPsLoading(true)
+    try {
+      const res = await fetch("/api/payments/withdraw-plus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user!.id, method: "playstation", amount: psAmount, email: psEmail.trim() }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed")
+      setPsSuccess(true); await refreshUser()
+    } catch (e: any) { setPsError(e.message) } finally { setPsLoading(false) }
+  }
+
   const fee = withdrawAmount ? (Number(withdrawAmount) * 0.05).toFixed(2) : "0.00"
   const net = withdrawAmount ? (Number(withdrawAmount) * 0.95).toFixed(2) : "0.00"
 
@@ -270,16 +333,48 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
               exclusive
               onChange={(_, v) => { if (v) setWithdrawMode(v) }}
               size="small"
-              fullWidth
+              sx={{ flexWrap: "wrap", gap: 0.5 }}
             >
-              <ToggleButton value="crypto" sx={{ fontWeight: 600 }}>
-                Cryptocurrency
-              </ToggleButton>
+              <ToggleButton value="crypto" sx={{ fontWeight: 600 }}>Crypto</ToggleButton>
               <ToggleButton value="giftcard" sx={{ fontWeight: 600, gap: 1 }}>
-                <CardGiftcardIcon fontSize="small" />
-                Gift Card
+                <CardGiftcardIcon fontSize="small" /> Gift Card
               </ToggleButton>
+              {/* PayPal — Plus only */}
+              <Tooltip title={user?.plus ? "" : "OmegaCases Plus required"} placement="top" arrow>
+                <span>
+                  <ToggleButton value="paypal" disabled={!user?.plus} sx={{ fontWeight: 600, gap: 1, position: "relative" }}>
+                    <Box component="img" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/paypallogo123-G99SStT7wb4CEZz1gGitslbltQ9F6Q.png" alt="PayPal" sx={{ width: 18, height: 18, objectFit: "contain" }} />
+                    PayPal
+                    {!user?.plus && <LockIcon sx={{ fontSize: 13, ml: 0.25, color: "text.disabled" }} />}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+              {/* Xbox — Plus only */}
+              <Tooltip title={user?.plus ? "" : "OmegaCases Plus required"} placement="top" arrow>
+                <span>
+                  <ToggleButton value="xbox" disabled={!user?.plus} sx={{ fontWeight: 600, gap: 1 }}>
+                    <Box component="img" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-ZTdgmDAPhELRfnlt6bfEGu3OCH5PwV.png" alt="Xbox" sx={{ width: 18, height: 18, objectFit: "contain" }} />
+                    Xbox
+                    {!user?.plus && <LockIcon sx={{ fontSize: 13, ml: 0.25, color: "text.disabled" }} />}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+              {/* PlayStation — Plus only */}
+              <Tooltip title={user?.plus ? "" : "OmegaCases Plus required"} placement="top" arrow>
+                <span>
+                  <ToggleButton value="playstation" disabled={!user?.plus} sx={{ fontWeight: 600, gap: 1 }}>
+                    <Box component="img" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-2QJy6WkSZDAw1CJ1HDB3fdBaR6IHsR.png" alt="PlayStation" sx={{ width: 18, height: 18, objectFit: "contain" }} />
+                    PS Store
+                    {!user?.plus && <LockIcon sx={{ fontSize: 13, ml: 0.25, color: "text.disabled" }} />}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
             </ToggleButtonGroup>
+            {!user?.plus && (
+              <Alert severity="info" icon={<WorkspacePremiumIcon fontSize="small" />} sx={{ py: 0.5 }}>
+                <Link href="/plus" onClick={onClose} style={{ color: "inherit", fontWeight: 700 }}>Get OmegaCases Plus</Link> to unlock PayPal, Xbox, and PlayStation withdrawals.
+              </Alert>
+            )}
 
             {/* CRYPTO WITHDRAW */}
             {withdrawMode === "crypto" && (
@@ -400,6 +495,58 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                   sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                   {gcLoading && <CircularProgress size={16} sx={{ color: "inherit" }} />}
                   {gcLoading ? "Submitting..." : `Request $${gcAmount} Gift Card`}
+                </Button>
+              </>
+            )}
+            {/* PAYPAL WITHDRAW */}
+            {withdrawMode === "paypal" && user?.plus && (
+              <>
+                <Alert severity="info">Minimum $10.00. Processed within 24–48 hours.</Alert>
+                <TextField label="PayPal Email" type="email" value={ppEmail} onChange={(e) => setPpEmail(e.target.value)} fullWidth placeholder="you@paypal.com" />
+                <TextField label="Amount (USD)" type="number" value={ppAmount} onChange={(e) => setPpAmount(e.target.value)} inputProps={{ min: 10, step: 0.01 }} fullWidth />
+                {ppError && <Alert severity="error">{ppError}</Alert>}
+                {ppSuccess && <Alert severity="success">PayPal withdrawal requested! You'll receive it within 24–48h.</Alert>}
+                <Button variant="contained" onClick={handlePayPal} disabled={ppLoading} sx={{ gap: 1 }}>
+                  {ppLoading && <CircularProgress size={16} sx={{ color: "inherit" }} />}
+                  {ppLoading ? "Submitting..." : "Request PayPal Withdrawal"}
+                </Button>
+              </>
+            )}
+
+            {/* XBOX WITHDRAW */}
+            {withdrawMode === "xbox" && user?.plus && (
+              <>
+                <Alert severity="info">Xbox Gift Card sent to your email within 3 days.</Alert>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  {[25, 50].map((a) => (
+                    <Chip key={a} label={`$${a}`} onClick={() => setXboxAmount(a as any)} color={xboxAmount === a ? "primary" : "default"} variant={xboxAmount === a ? "filled" : "outlined"} sx={{ cursor: "pointer", fontWeight: 700, fontSize: "0.95rem", px: 2, height: 36 }} />
+                  ))}
+                </Box>
+                <TextField label="Email address" type="email" value={xboxEmail} onChange={(e) => setXboxEmail(e.target.value)} fullWidth placeholder="you@example.com" helperText="Xbox gift card sent to this email" />
+                {xboxError && <Alert severity="error">{xboxError}</Alert>}
+                {xboxSuccess && <Alert severity="success">Xbox gift card requested! Check your email within 3 days.</Alert>}
+                <Button variant="contained" onClick={handleXbox} disabled={xboxLoading} sx={{ gap: 1 }}>
+                  {xboxLoading && <CircularProgress size={16} sx={{ color: "inherit" }} />}
+                  {xboxLoading ? "Submitting..." : `Request $${xboxAmount} Xbox Gift Card`}
+                </Button>
+              </>
+            )}
+
+            {/* PLAYSTATION WITHDRAW */}
+            {withdrawMode === "playstation" && user?.plus && (
+              <>
+                <Alert severity="info">PlayStation Store gift card sent to your email within 3 days.</Alert>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  {[25, 50].map((a) => (
+                    <Chip key={a} label={`$${a}`} onClick={() => setPsAmount(a as any)} color={psAmount === a ? "primary" : "default"} variant={psAmount === a ? "filled" : "outlined"} sx={{ cursor: "pointer", fontWeight: 700, fontSize: "0.95rem", px: 2, height: 36 }} />
+                  ))}
+                </Box>
+                <TextField label="Email address" type="email" value={psEmail} onChange={(e) => setPsEmail(e.target.value)} fullWidth placeholder="you@example.com" helperText="PlayStation gift card sent to this email" />
+                {psError && <Alert severity="error">{psError}</Alert>}
+                {psSuccess && <Alert severity="success">PlayStation gift card requested! Check your email within 3 days.</Alert>}
+                <Button variant="contained" onClick={handlePlayStation} disabled={psLoading} sx={{ gap: 1 }}>
+                  {psLoading && <CircularProgress size={16} sx={{ color: "inherit" }} />}
+                  {psLoading ? "Submitting..." : `Request $${psAmount} PS Store Gift Card`}
                 </Button>
               </>
             )}

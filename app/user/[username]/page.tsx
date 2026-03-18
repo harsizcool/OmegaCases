@@ -14,6 +14,7 @@ import type { InventoryItem, Rarity } from "@/lib/types"
 import { RARITY_COLORS, VALUE_RARITIES } from "@/lib/types"
 import NextLink from "next/link"
 import AccessTimeIcon from "@mui/icons-material/AccessTime"
+import PlusBadge from "@/components/plus-badge"
 
 type SortMode = "rap" | "latest"
 
@@ -175,7 +176,10 @@ export default function UserPage() {
           </Avatar>
         )}
         <Box>
-          <Typography variant="h4" fontWeight={700}>{profile?.username}</Typography>
+          <Typography variant="h4" fontWeight={700} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {profile?.username}
+            {profile?.plus && <PlusBadge size={24} />}
+          </Typography>
           <Typography variant="body1" color="text.secondary">
             Inventory Value (RAP):{" "}
             <strong style={{ color: "#1976d2" }}>${rapValue.toFixed(2)}</strong>

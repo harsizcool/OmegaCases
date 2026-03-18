@@ -12,6 +12,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime"
 import NextLink from "next/link"
 import { RARITY_COLORS } from "@/lib/types"
 import type { Rarity } from "@/lib/types"
+import PlusBadge from "@/components/plus-badge"
 
 interface SearchResults {
   items: any[]
@@ -184,7 +185,10 @@ function SearchInner() {
                             {u.username[0].toUpperCase()}
                           </Avatar>
                         )}
-                        <Typography variant="body2" fontWeight={700} textAlign="center">{u.username}</Typography>
+                        <Typography variant="body2" fontWeight={700} textAlign="center" sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
+                          {u.username}
+                          {u.plus && <PlusBadge />}
+                        </Typography>
                       </CardContent>
                     </Card>
                   </Grid>

@@ -222,7 +222,7 @@ export default function OpenPage() {
                 targetItem={targetItem}
                 spinning={spinning}
                 onComplete={handleSpinComplete}
-                speed={doubleSpeed ? 2 : 1}
+                speed={doubleSpeed ? (user?.plus ? 3 : 2) : 1}
                 muted={muted}
               />
             </Box>

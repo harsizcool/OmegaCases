@@ -17,6 +17,7 @@ import SearchIcon from "@mui/icons-material/Search"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
 import type { InventoryItem, Rarity } from "@/lib/types"
+import PlusBadge from "@/components/plus-badge"
 
 const MAX_ITEMS = 6
 const MAX_BALANCE = 50
@@ -435,6 +436,7 @@ export default function TradePage() {
                   >
                     {other?.username}
                   </Box>
+                  {other?.plus && <PlusBadge sx={{ ml: 0.5, verticalAlign: "middle" }} />}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {new Date(trade.created_at).toLocaleDateString()}

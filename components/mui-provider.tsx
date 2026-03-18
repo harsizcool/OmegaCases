@@ -1,120 +1,159 @@
 "use client"
-
+// v7 — correct emotion SSR with useServerInsertedHTML
 import * as React from "react"
-import { createTheme, ThemeProvider, CssBaseline } from "@mui/material"
-import { CacheProvider } from "@emotion/react"
-import createCache from "@emotion/cache"
 import { useServerInsertedHTML } from "next/navigation"
+import { ThemeProvider, createTheme, CssBaseline } from "@mui/material"
+import createCache from "@emotion/cache"
+import { CacheProvider } from "@emotion/react"
+import { useTheme } from "next-themes"
 import { AuthProvider } from "@/lib/auth-context"
 
-const theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: {
-      main: "#1976d2",
-      light: "#42a5f5",
-      dark: "#1565c0",
-    },
-    secondary: {
-      main: "#e3f2fd",
-    },
-    background: {
-      default: "#ffffff",
-      paper: "#f8fbff",
-    },
-    text: {
-      primary: "#0d1b2a",
-      secondary: "#546e7a",
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: { fontWeight: 700 },
-    h2: { fontWeight: 700 },
-    h3: { fontWeight: 600 },
-    h4: { fontWeight: 600 },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
-  },
-  shape: {
-    borderRadius: 10,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: "none",
-          fontWeight: 600,
-          borderRadius: 8,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: "0 2px 12px rgba(25,118,210,0.08)",
-        },
-      },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: {
-          fontWeight: 600,
-        },
-      },
-    },
-  },
+interface ThemeContextValue {
+  mode: "light" | "dark"
+  toggleMode: () => void
+}
+
+export const ThemeContext = React.createContext<ThemeContextValue>({
+  mode: "light",
+  toggleMode: () => {},
 })
 
-function NextAppDirEmotionCacheProvider({ children }: { children: React.ReactNode }) {
+export function useThemeMode() {
+  return React.useContext(ThemeContext)
+}
+
+function buildTheme(mode: "light" | "dark") {
+  return createTheme({
+    palette: {
+      mode,
+      primary: { main: "#1976d2", light: "#42a5f5", dark: "#1565c0" },
+      secondary: { main: "#e3f2fd" },
+      background: {
+        default: mode === "light" ? "#ffffff" : "#0d1b2a",
+        paper:   mode === "light" ? "#f8fbff" : "#132233",
+      },
+      text: {
+        primary:   mode === "light" ? "#0d1b2a" : "#e8f0fe",
+        secondary: mode === "light" ? "#546e7a" : "#90a4ae",
+      },
+    },
+    typography: {
+      fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
+      h1: { fontWeight: 700 }, h2: { fontWeight: 700 },
+      h3: { fontWeight: 600 }, h4: { fontWeight: 600 },
+      h5: { fontWeight: 600 }, h6: { fontWeight: 600 },
+    },
+    shape: { borderRadius: 10 },
+    components: {
+      MuiButton: {
+        styleOverrides: { root: { textTransform: "none", fontWeight: 600, borderRadius: 8 } },
+      },
+      MuiCard: {
+        styleOverrides: { root: { borderRadius: 12, boxShadow: "0 2px 12px rgba(25,118,210,0.08)" } },
+      },
+      MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
+      MuiCssBaseline: {
+        styleOverrides: (theme: any) => ({
+          body: {
+            backgroundColor: theme.palette.background.default,
+            color: theme.palette.text.primary,
+            transition: "background-color 0.2s, color 0.2s",
+          },
+        }),
+      },
+    },
+  })
+}
+
+// Handles emotion SSR style injection correctly in Next.js App Router
+function EmotionCacheProvider({ children }: { children: React.ReactNode }) {
   const [{ cache, flush }] = React.useState(() => {
-    const emotionCache = createCache({ key: "css" })
-    emotionCache.compat = true
-    const prevInsert = emotionCache.insert.bind(emotionCache)
-    let inserted: string[] = []
-    emotionCache.insert = (...args) => {
+    const cache = createCache({ key: "mui" })
+    cache.compat = true
+    const prevInsert = cache.insert.bind(cache)
+    let inserted: { name: string; isGlobal: boolean }[] = []
+    cache.insert = (...args) => {
       const serialized = args[1]
-      if (emotionCache.inserted[serialized.name] === undefined) {
-        inserted.push(serialized.name)
+      if (cache.inserted[serialized.name] === undefined) {
+        inserted.push({ name: serialized.name, isGlobal: !args[0] })
       }
       return prevInsert(...args)
     }
-    const flushFn = () => {
+    function flush() {
       const prevInserted = inserted
       inserted = []
       return prevInserted
     }
-    return { cache: emotionCache, flush: flushFn }
+    return { cache, flush }
   })
 
   useServerInsertedHTML(() => {
-    const names = flush()
-    if (names.length === 0) return null
+    const inserted = flush()
+    if (!inserted.length) return null
     let styles = ""
-    for (const name of names) {
-      styles += cache.inserted[name]
+    let dataEmotionAttribute = cache.key
+    const globals: { name: string; style: string }[] = []
+    for (const { name, isGlobal } of inserted) {
+      const style = cache.inserted[name]
+      if (typeof style !== "boolean") {
+        if (isGlobal) {
+          globals.push({ name, style })
+        } else {
+          styles += style
+          dataEmotionAttribute += ` ${name}`
+        }
+      }
     }
     return (
-      <style
-        key={cache.key}
-        data-emotion={`${cache.key} ${names.join(" ")}`}
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: styles }}
-      />
+      <React.Fragment>
+        {globals.map(({ name, style }) => (
+          <style
+            key={name}
+            data-emotion={`${cache.key}-global ${name}`}
+            dangerouslySetInnerHTML={{ __html: style }}
+          />
+        ))}
+        {styles && (
+          <style
+            data-emotion={dataEmotionAttribute}
+            dangerouslySetInnerHTML={{ __html: styles }}
+          />
+        )}
+      </React.Fragment>
     )
   })
 
   return <CacheProvider value={cache}>{children}</CacheProvider>
 }
 
-export default function MuiProvider({ children }: { children: React.ReactNode }) {
+// Inner component reads next-themes and builds the MUI theme
+function ThemeInner({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => { setMounted(true) }, [])
+
+  // Always light on first render to match server HTML
+  const mode: "light" | "dark" = mounted && resolvedTheme === "dark" ? "dark" : "light"
+  const theme = React.useMemo(() => buildTheme(mode), [mode])
+
+  const toggleMode = React.useCallback(() => {
+    setTheme(mode === "dark" ? "light" : "dark")
+  }, [mode, setTheme])
+
   return (
-    <NextAppDirEmotionCacheProvider>
+    <ThemeContext.Provider value={{ mode, toggleMode }}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>{children}</AuthProvider>
       </ThemeProvider>
-    </NextAppDirEmotionCacheProvider>
+    </ThemeContext.Provider>
+  )
+}
+
+export default function MuiProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <EmotionCacheProvider>
+      <ThemeInner>{children}</ThemeInner>
+    </EmotionCacheProvider>
   )
 }

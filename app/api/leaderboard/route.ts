@@ -8,7 +8,7 @@ export async function GET() {
   // select all inventory rows with the joined item data, then sum rap per user
   const { data: users } = await db
     .from("users")
-    .select("id, username, profile_picture")
+    .select("id, username, profile_picture, plus")
 
   if (!users) return NextResponse.json([])
 
@@ -45,6 +45,7 @@ export async function GET() {
       id: u.id,
       username: u.username,
       profile_picture: u.profile_picture,
+      plus: u.plus ?? false,
       rap: Math.round((rapMap[u.id] || 0) * 100) / 100,
       itemCount: countMap[u.id] || 0,
     }))

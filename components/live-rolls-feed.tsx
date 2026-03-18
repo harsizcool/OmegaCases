@@ -88,19 +88,19 @@ export default function LiveRollsFeed() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Desktop: auto-scroll sidebar to bottom on new roll
+  // Desktop: auto-scroll sidebar to bottom whenever rolls change (initial load + new rolls)
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight
     }
-  }, [rolls.length])
+  })
 
-  // Mobile ticker: scroll right to show latest
+  // Mobile ticker: scroll right to show latest whenever rolls change
   useEffect(() => {
     if (tickerRef.current) {
       tickerRef.current.scrollLeft = tickerRef.current.scrollWidth
     }
-  }, [rolls.length])
+  })
 
   const dotSx = {
     width: 8,

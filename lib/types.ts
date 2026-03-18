@@ -7,6 +7,7 @@ export interface User {
   profile_picture: string | null
   balance: number
   admin: boolean
+  plus: boolean
   cases: number
   cases_remaining: number
   created_at: string

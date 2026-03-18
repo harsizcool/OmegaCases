@@ -8,11 +8,13 @@ import {
   TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material"
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
+import PlusBadge from "@/components/plus-badge"
 
 interface LeaderboardEntry {
   id: string
   username: string
   profile_picture: string | null
+  plus: boolean
   rap: number
   itemCount: number
 }
@@ -88,6 +90,7 @@ export default function LeaderboardPage() {
                         </Avatar>
                       )}
                       <Typography fontWeight={600}>{entry.username}</Typography>
+                      {entry.plus && <PlusBadge />}
                     </Box>
                   </TableCell>
                   <TableCell align="right">
