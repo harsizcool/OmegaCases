@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     .from("trades")
     .select(`
       *,
-      receiver:users!trades_receiver_id_fkey(id, username, profile_picture),
+      receiver:users!trades_receiver_id_fkey(id, username, profile_picture, plus),
       trade_items(id, side, inventory:inventory(id, item_id, items(id, name, image_url, rarity, rap)))
     `)
     .eq("sender_id", userId)

@@ -12,6 +12,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu"
 import WorkspacesIcon from "@mui/icons-material/Workspaces"
 import SearchIcon from "@mui/icons-material/Search"
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
 import { useAuth } from "@/lib/auth-context"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
 
@@ -119,6 +120,14 @@ export default function Navbar() {
                 sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
               >
                 Leaderboard
+              </Button>
+              <Button
+                component={NextLink}
+                href="/plus"
+                startIcon={<WorkspacePremiumIcon sx={{ color: "#f59e0b" }} />}
+                sx={{ color: "#f59e0b", fontWeight: 700, "&:hover": { bgcolor: "#fffbeb" } }}
+              >
+                Plus
               </Button>
             </Box>
 
@@ -282,6 +291,18 @@ export default function Navbar() {
             <ListItem disablePadding>
               <ListItemButton component={NextLink} href="/leaderboard" onClick={() => setMobileOpen(false)}>
                 <ListItemText primary="Leaderboard" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={NextLink} href="/plus" onClick={() => setMobileOpen(false)}>
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <WorkspacePremiumIcon sx={{ fontSize: 18, color: "#f59e0b" }} />
+                      <Typography fontWeight={700} sx={{ color: "#f59e0b" }}>Plus</Typography>
+                    </Box>
+                  }
+                />
               </ListItemButton>
             </ListItem>
             {mounted && user && (

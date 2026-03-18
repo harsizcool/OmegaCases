@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const { data: items } = await itemsQuery.order("rap", { ascending: false }).limit(20)
 
   // Users
-  let usersQuery = db.from("users").select("id, username, profile_picture")
+  let usersQuery = db.from("users").select("id, username, profile_picture, plus")
   if (q) usersQuery = usersQuery.ilike("username", `%${q}%`)
   const { data: users } = await usersQuery.limit(20)
 
