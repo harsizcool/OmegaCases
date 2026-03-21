@@ -58,7 +58,50 @@ export default function AdminPage() {
   const [capsError, setCapsError] = useState("")
   const [capsSuccess, setCapsSuccess] = useState(false)
 
-  // New item form
+  // Banner state
+  const [bannerText, setBannerText] = useState("")
+  const [bannerColor, setBannerColor] = useState("#1565c0")
+  const [bannerSaving, setBannerSaving] = useState(false)
+  const [bannerSuccess, setBannerSuccess] = useState(false)
+  const [bannerError, setBannerError] = useState("")
+
+  // Case prices state
+  const DEFAULT_CASE_PRICES = [{ qty: 10, price: 0.39 }, { qty: 100, price: 2.99 }, { qty: 1000, price: 9.99 }]
+  const [casePrices, setCasePrices] = useState(DEFAULT_CASE_PRICES)
+  const [cpSaving, setCpSaving] = useState(false)
+  const [cpSuccess, setCpSuccess] = useState(false)
+  const [cpError, setCpError] = useState("")
+
+  const saveCasePrices = async () => {
+    setCpSaving(true); setCpError(""); setCpSuccess(false)
+    try {
+      if (!user?.id) throw new Error("Not authenticated")
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "case_prices", value: casePrices, user_id: user.id }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error || "Failed") }
+      setCpSuccess(true)
+    } catch (e: any) { setCpError(e.message) } finally { setCpSaving(false) }
+  }
+
+  const saveBanner = async () => {
+    setBannerSaving(true); setBannerError(""); setBannerSuccess(false)
+    try {
+      if (!user?.id) throw new Error("Not authenticated")
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "banner", value: { text: bannerText.trim(), color: bannerColor }, user_id: user.id }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error || "Failed") }
+      setBannerSuccess(true)
+    } catch (e: any) { setBannerError(e.message) } finally { setBannerSaving(false) }
+  }
+
+  // Load banner in loadCaps
+
   const [name, setName] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -100,6 +143,9 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/settings")
       const data = await res.json()
       if (data.rarity_price_caps) setCaps(data.rarity_price_caps)
+      if (Array.isArray(data.case_prices) && data.case_prices.length > 0) setCasePrices(data.case_prices)
+      if (data.banner?.text !== undefined) setBannerText(data.banner.text)
+      if (data.banner?.color) setBannerColor(data.banner.color)
     } catch {}
     setCapsLoading(false)
   }
@@ -109,19 +155,11 @@ export default function AdminPage() {
     setCapsError("")
     setCapsSuccess(false)
     try {
-      // Get session token from browser Supabase client for Authorization header
-      const browserDb = createBrowserClient()
-      const { data: { session } } = await browserDb.auth.getSession()
-      const token = session?.access_token
-      if (!token) throw new Error("Not authenticated")
-
+      if (!user?.id) throw new Error("Not authenticated")
       const res = await fetch("/api/admin/settings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ key: "rarity_price_caps", value: caps }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "rarity_price_caps", value: caps, user_id: user.id }),
       })
       if (!res.ok) {
         const body = await res.json()
@@ -425,6 +463,118 @@ export default function AdminPage() {
                 </Button>
               </Box>
             )}
+
+            {/* Case Prices */}
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" fontWeight={700} gutterBottom>Case Prices</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Set how much each bundle of cases costs. Defaults: 10 for $0.39, 100 for $2.99, 1000 for $9.99.
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {casePrices.map((cp, i) => (
+                  <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <TextField
+                      label="Qty"
+                      type="number"
+                      value={cp.qty}
+                      onChange={(e) => {
+                        const next = [...casePrices]
+                        next[i] = { ...next[i], qty: Number(e.target.value) }
+                        setCasePrices(next)
+                      }}
+                      inputProps={{ min: 1, step: 1 }}
+                      sx={{ width: 120 }}
+                      size="small"
+                    />
+                    <TextField
+                      label="Price ($)"
+                      type="number"
+                      value={cp.price}
+                      onChange={(e) => {
+                        const next = [...casePrices]
+                        next[i] = { ...next[i], price: Number(e.target.value) }
+                        setCasePrices(next)
+                      }}
+                      inputProps={{ min: 0, step: 0.01 }}
+                      sx={{ width: 140 }}
+                      size="small"
+                      InputProps={{ startAdornment: <Typography variant="body2" sx={{ mr: 0.5 }}>$</Typography> }}
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      disabled={casePrices.length <= 1}
+                      onClick={() => setCasePrices(casePrices.filter((_, j) => j !== i))}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+                <Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setCasePrices([...casePrices, { qty: 0, price: 0 }])}
+                  >
+                    + Add Tier
+                  </Button>
+                </Box>
+                {cpError && <Alert severity="error">{cpError}</Alert>}
+                {cpSuccess && <Alert severity="success">Case prices saved!</Alert>}
+                <Button
+                  variant="contained"
+                  startIcon={cpSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
+                  disabled={cpSaving}
+                  onClick={saveCasePrices}
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  {cpSaving ? "Saving..." : "Save Case Prices"}
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Banner */}            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" fontWeight={700} gutterBottom>Site Banner</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Shown at the top of every page. Leave text empty to hide the banner.
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <TextField
+                  label="Banner Text"
+                  value={bannerText}
+                  onChange={(e) => setBannerText(e.target.value)}
+                  fullWidth
+                  placeholder="Leave empty to hide banner"
+                  helperText="Leave blank to remove the banner entirely"
+                />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>Background Color</Typography>
+                  <input
+                    type="color"
+                    value={bannerColor}
+                    onChange={(e) => setBannerColor(e.target.value)}
+                    style={{ width: 48, height: 36, border: "none", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                  />
+                  <Typography variant="body2" color="text.secondary">{bannerColor}</Typography>
+                </Box>
+                {bannerText && (
+                  <Box sx={{ bgcolor: bannerColor, color: "#fff", py: 0.75, px: 2, borderRadius: 1, textAlign: "center" }}>
+                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.8rem" }}>{bannerText}</Typography>
+                  </Box>
+                )}
+                {bannerError && <Alert severity="error">{bannerError}</Alert>}
+                {bannerSuccess && <Alert severity="success">Banner saved!</Alert>}
+                <Button
+                  variant="contained"
+                  startIcon={bannerSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
+                  disabled={bannerSaving}
+                  onClick={saveBanner}
+                >
+                  {bannerSaving ? "Saving..." : "Save Banner"}
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       )}

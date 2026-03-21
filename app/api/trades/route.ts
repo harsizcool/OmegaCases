@@ -1,6 +1,7 @@
 // API: GET/POST /api/trades
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createNotification } from "@/lib/notifications"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -72,6 +73,17 @@ export async function POST(request: Request) {
   if (itemInserts.length > 0) {
     await supabase.from("trade_items").insert(itemInserts)
   }
+
+  // Notify receiver of new trade offer
+  const { data: senderProfile } = await supabase
+    .from("users").select("username").eq("id", sender_id).single()
+  await createNotification({
+    user_id: receiver_id,
+    type: "trade_received",
+    title: "New Trade Offer",
+    body: `${senderProfile?.username ?? "Someone"} sent you a trade offer.`,
+    link: "/trade",
+  })
 
   return NextResponse.json({ success: true, trade_id: trade.id })
 }

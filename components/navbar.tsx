@@ -18,6 +18,7 @@ import LightModeIcon from "@mui/icons-material/LightMode"
 import { useAuth } from "@/lib/auth-context"
 import { useThemeMode } from "./mui-provider"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
+import NotificationBell from "./notification-bell"
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -207,6 +208,7 @@ export default function Navbar() {
                       </span>
                     </Tooltip>
                   )}
+                  <NotificationBell userId={user.id} />
                   <IconButton onClick={handleUserMenu} size="small" sx={{ flexShrink: 0 }}>
                     {user.profile_picture ? (
                       <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />

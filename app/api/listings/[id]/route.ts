@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createNotification } from "@/lib/notifications"
 
 export async function POST(
   request: Request,
@@ -11,7 +12,7 @@ export async function POST(
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("*, items(market_price)")
+    .select("*, items(name, market_price)")
     .eq("id", listing_id)
     .eq("status", "active")
     .single()
@@ -70,6 +71,15 @@ export async function POST(
       buyer_id,
       price: listing.price,
     })
+
+  // Notify seller their item sold — link to the item page, not user profile
+  await createNotification({
+    user_id: listing.seller_id,
+    type: "item_sold",
+    title: "Item Sold",
+    body: `Your listing sold for $${Number(listing.price).toFixed(2)}.`,
+    link: `/item/${encodeURIComponent((listing.items as any)?.name ?? listing.item_id)}`,
+  })
 
   // Update item RAP and market_price to AVERAGE of ALL sales (paginated past 1000)
   // Fetch all sales in pages of 1000

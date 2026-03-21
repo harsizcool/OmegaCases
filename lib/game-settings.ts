@@ -44,3 +44,22 @@ export async function getCasePrices(): Promise<CasePrice[]> {
   }
   return CASE_PRICES
 }
+
+export type BannerSettings = { text: string; color: string } | null
+
+export async function getBannerSettings(): Promise<BannerSettings> {
+  try {
+    const db = await createClient()
+    const { data } = await db
+      .from("game_settings")
+      .select("value")
+      .eq("key", "banner")
+      .single()
+    if (data?.value && typeof data.value === "object") {
+      const v = data.value as { text?: string; color?: string }
+      if (!v.text) return null
+      return { text: v.text, color: v.color || "#1565c0" }
+    }
+  } catch {}
+  return null
+}

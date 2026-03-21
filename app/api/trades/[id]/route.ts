@@ -1,6 +1,7 @@
 // API: POST /api/trades/[id]/accept  and  POST /api/trades/[id]/decline
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createNotification } from "@/lib/notifications"
 
 export async function POST(
   request: Request,
@@ -24,7 +25,20 @@ export async function POST(
     if (user_id !== allowed && user_id !== trade.sender_id && user_id !== trade.receiver_id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
-    await supabase.from("trades").update({ status: action === "cancel" ? "cancelled" : "declined", updated_at: new Date().toISOString() }).eq("id", trade_id)
+    const newStatus = action === "cancel" ? "cancelled" : "declined"
+    await supabase.from("trades").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", trade_id)
+
+    // Notify the other party
+    const notifyUserId = action === "cancel" ? trade.receiver_id : trade.sender_id
+    await createNotification({
+      user_id: notifyUserId,
+      type: action === "cancel" ? "trade_cancelled" : "trade_declined",
+      title: action === "cancel" ? "Trade Cancelled" : "Trade Declined",
+      body: action === "cancel"
+        ? "A trade offer you received was cancelled by the sender."
+        : "Your trade offer was declined.",
+      link: "/trade",
+    })
     return NextResponse.json({ success: true })
   }
 
@@ -61,6 +75,16 @@ export async function POST(
     await supabase.from("users").update({ balance: receiverNewBalance }).eq("id", trade.receiver_id)
 
     await supabase.from("trades").update({ status: "accepted", updated_at: new Date().toISOString() }).eq("id", trade_id)
+
+    // Notify sender their trade was accepted
+    await createNotification({
+      user_id: trade.sender_id,
+      type: "trade_accepted",
+      title: "Trade Accepted",
+      body: "Your trade offer was accepted!",
+      link: "/trade",
+    })
+
     return NextResponse.json({ success: true })
   }
 
