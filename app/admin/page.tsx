@@ -58,7 +58,32 @@ export default function AdminPage() {
   const [capsError, setCapsError] = useState("")
   const [capsSuccess, setCapsSuccess] = useState(false)
 
-  // New item form
+  // Banner state
+  const [bannerText, setBannerText] = useState("")
+  const [bannerColor, setBannerColor] = useState("#1565c0")
+  const [bannerSaving, setBannerSaving] = useState(false)
+  const [bannerSuccess, setBannerSuccess] = useState(false)
+  const [bannerError, setBannerError] = useState("")
+
+  const saveBanner = async () => {
+    setBannerSaving(true); setBannerError(""); setBannerSuccess(false)
+    try {
+      const browserDb = createBrowserClient()
+      const { data: { session } } = await browserDb.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error("Not authenticated")
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ key: "banner", value: { text: bannerText.trim(), color: bannerColor } }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error || "Failed") }
+      setBannerSuccess(true)
+    } catch (e: any) { setBannerError(e.message) } finally { setBannerSaving(false) }
+  }
+
+  // Load banner in loadCaps
+
   const [name, setName] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -100,6 +125,8 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/settings")
       const data = await res.json()
       if (data.rarity_price_caps) setCaps(data.rarity_price_caps)
+      if (data.banner?.text !== undefined) setBannerText(data.banner.text)
+      if (data.banner?.color) setBannerColor(data.banner.color)
     } catch {}
     setCapsLoading(false)
   }
@@ -425,6 +452,49 @@ export default function AdminPage() {
                 </Button>
               </Box>
             )}
+
+            {/* Banner */}
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" fontWeight={700} gutterBottom>Site Banner</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Shown at the top of every page. Leave text empty to hide the banner.
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <TextField
+                  label="Banner Text"
+                  value={bannerText}
+                  onChange={(e) => setBannerText(e.target.value)}
+                  fullWidth
+                  placeholder="Leave empty to hide banner"
+                  helperText="Leave blank to remove the banner entirely"
+                />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>Background Color</Typography>
+                  <input
+                    type="color"
+                    value={bannerColor}
+                    onChange={(e) => setBannerColor(e.target.value)}
+                    style={{ width: 48, height: 36, border: "none", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                  />
+                  <Typography variant="body2" color="text.secondary">{bannerColor}</Typography>
+                </Box>
+                {bannerText && (
+                  <Box sx={{ bgcolor: bannerColor, color: "#fff", py: 0.75, px: 2, borderRadius: 1, textAlign: "center" }}>
+                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.8rem" }}>{bannerText}</Typography>
+                  </Box>
+                )}
+                {bannerError && <Alert severity="error">{bannerError}</Alert>}
+                {bannerSuccess && <Alert severity="success">Banner saved!</Alert>}
+                <Button
+                  variant="contained"
+                  startIcon={bannerSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
+                  disabled={bannerSaving}
+                  onClick={saveBanner}
+                >
+                  {bannerSaving ? "Saving..." : "Save Banner"}
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       )}

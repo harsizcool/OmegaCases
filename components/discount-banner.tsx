@@ -1,17 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Box, Typography, IconButton } from "@mui/material"
 import CloseIcon from "@mui/icons-material/Close"
 
 export default function DiscountBanner() {
+  const [text, setText] = useState("")
+  const [color, setColor] = useState("#1565c0")
   const [dismissed, setDismissed] = useState(false)
-  if (dismissed) return null
+
+  useEffect(() => {
+    fetch("/api/banner")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.text) { setText(d.text); setColor(d.color || "#1565c0") }
+      })
+      .catch(() => {})
+  }, [])
+
+  if (!text || dismissed) return null
 
   return (
     <Box
       sx={{
-        bgcolor: "#1565c0",
+        bgcolor: color,
         color: "#fff",
         py: 0.75,
         px: 2,
@@ -28,7 +40,7 @@ export default function DiscountBanner() {
         fontWeight={700}
         sx={{ letterSpacing: 0.5, textAlign: "center", fontSize: { xs: "0.7rem", sm: "0.85rem" } }}
       >
-        CASES ARE AT A TEMPORARY DISCOUNT! GET THEM BEFORE IT RESETS
+        {text}
       </Typography>
       <IconButton
         size="small"
