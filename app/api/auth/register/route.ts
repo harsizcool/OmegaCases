@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import bcrypt from "bcryptjs"
+import { randomBytes } from "crypto"
+
+function generateSessionToken(): string {
+  return randomBytes(48).toString("hex")
+}
 
 export async function POST(request: Request) {
   const { username, password } = await request.json()
@@ -27,6 +32,7 @@ export async function POST(request: Request) {
   }
 
   const hashed = await bcrypt.hash(password, 12)
+  const sessionToken = generateSessionToken()
 
   const { data: newUser, error } = await supabase
     .from("users")
@@ -36,6 +42,7 @@ export async function POST(request: Request) {
       balance: 0,
       admin: false,
       cases: 0,
+      session_token: sessionToken,
     })
     .select("*")
     .single()
@@ -45,6 +52,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message || "Registration failed" }, { status: 500 })
   }
 
-  const { password: _pw, ...safeUser } = newUser
-  return NextResponse.json({ user: safeUser })
+  const { password: _pw, session_token: _st, ...safeUser } = newUser
+  return NextResponse.json({ user: safeUser, session_token: sessionToken })
 }

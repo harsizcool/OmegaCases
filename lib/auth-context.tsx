@@ -4,6 +4,9 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@/lib/types"
 
+const TOKEN_KEY = "oc_session_token"
+const USER_KEY = "oc_user_id"
+
 interface AuthContextType {
   user: User | null
   loading: boolean
@@ -19,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Fetch fresh user data from DB (used for refreshUser)
   const fetchUser = useCallback(async (userId: string) => {
     const supabase = createClient()
     const { data } = await supabase
@@ -30,23 +34,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refreshUser = useCallback(async () => {
-    const stored = localStorage.getItem("oc_user_id")
-    if (!stored) return
-    const u = await fetchUser(stored)
-    if (u) setUser(u)
-  }, [fetchUser])
+    const userId = localStorage.getItem(USER_KEY)
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!userId || !token) return
+    // Re-validate then fetch fresh data
+    const res = await fetch("/api/auth/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, session_token: token }),
+    })
+    if (!res.ok) return
+    const { user: freshUser } = await res.json()
+    if (freshUser) setUser(freshUser)
+  }, [])
 
   useEffect(() => {
     const init = async () => {
-      const stored = localStorage.getItem("oc_user_id")
-      if (stored) {
-        const u = await fetchUser(stored)
-        setUser(u)
+      const userId = localStorage.getItem(USER_KEY)
+      const token = localStorage.getItem(TOKEN_KEY)
+
+      if (userId && token) {
+        // Validate the session token server-side — rejects forged user IDs
+        const res = await fetch("/api/auth/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, session_token: token }),
+        })
+        if (res.ok) {
+          const { valid, user: validatedUser } = await res.json()
+          if (valid && validatedUser) {
+            setUser(validatedUser)
+          } else {
+            // Invalid or tampered session — clear it
+            localStorage.removeItem(USER_KEY)
+            localStorage.removeItem(TOKEN_KEY)
+          }
+        } else {
+          localStorage.removeItem(USER_KEY)
+          localStorage.removeItem(TOKEN_KEY)
+        }
       }
       setLoading(false)
     }
     init()
-  }, [fetchUser])
+  }, [])
 
   const login = async (username: string, password: string): Promise<{ error?: string }> => {
     const res = await fetch("/api/auth/login", {
@@ -56,7 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     const json = await res.json()
     if (!res.ok) return { error: json.error || "Login failed" }
-    localStorage.setItem("oc_user_id", json.user.id)
+    localStorage.setItem(USER_KEY, json.user.id)
+    localStorage.setItem(TOKEN_KEY, json.session_token)
     setUser(json.user)
     return {}
   }
@@ -69,13 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     const json = await res.json()
     if (!res.ok) return { error: json.error || "Registration failed" }
-    localStorage.setItem("oc_user_id", json.user.id)
+    localStorage.setItem(USER_KEY, json.user.id)
+    localStorage.setItem(TOKEN_KEY, json.session_token)
     setUser(json.user)
     return {}
   }
 
   const logout = async () => {
-    localStorage.removeItem("oc_user_id")
+    localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(TOKEN_KEY)
     setUser(null)
   }
 

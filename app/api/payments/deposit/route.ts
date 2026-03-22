@@ -16,6 +16,23 @@ async function notifyDiscord(content: string, fields?: { name: string; value: st
 
 // POST: Create payment for deposit
 export async function POST(request: Request) {
+  const supabase = await createClient()
+
+  // Check if deposits are paused
+  const { data: pauseSetting } = await supabase
+    .from("game_settings")
+    .select("value")
+    .eq("key", "payments_paused")
+    .single()
+
+  const paused = pauseSetting?.value === true || pauseSetting?.value?.deposits === true
+  if (paused) {
+    return NextResponse.json(
+      { error: "Deposits are temporarily paused. Please check back soon." },
+      { status: 503 }
+    )
+  }
+
   const { user_id, amount, currency } = await request.json()
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://omegacases.com"
@@ -48,12 +65,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: data.message || "Payment creation failed" }, { status: 500 })
   }
 
-  // Always cast payment_id to string — NOWPayments returns it as a number,
-  // but the DB column is text. Type mismatch causes silent null storage.
   const paymentIdStr = String(data.payment_id)
 
-  // Record pending deposit
-  const supabase = await createClient()
   const { error: insertError } = await supabase.from("deposits").insert({
     user_id,
     payment_id: paymentIdStr,
@@ -63,7 +76,6 @@ export async function POST(request: Request) {
     status: "pending",
   })
 
-  // Notify Discord on every new deposit so we can verify IDs match when IPN fires
   await notifyDiscord("<@1058838805253210172> New deposit created", [
     { name: "User ID", value: user_id, inline: true },
     { name: "Amount", value: `$${amount}`, inline: true },
