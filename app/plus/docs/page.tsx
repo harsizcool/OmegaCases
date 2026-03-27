@@ -99,6 +99,16 @@ const ENDPOINTS = [
   }
 ]`,
   },
+  {
+    method: "POST",
+    path: "/api/oauth/init",
+    auth: false,
+    desc: "Initialize an OAuth flow. Generate a consent page URL that redirects users through OmegaCases sign-in. No Plus required — public API.",
+    response: `{
+  "success": true,
+  "generated_url": "https://omegacases.com/ext/auth/a1b2c3d4"
+}`,
+  },
 ]
 
 const METHOD_COLORS: Record<string, string> = {
@@ -218,6 +228,56 @@ export default function PlusDocsPage() {
             </Box>
           </Paper>
         ))}
+      </Box>
+
+      {/* OAuth Guide */}
+      <Box sx={{ mt: 6 }}>
+        <Typography variant="h5" fontWeight={800} gutterBottom>OAuth / Sign In with OmegaCases</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Add "Sign In with OmegaCases" to your app in 2 steps. Generate a consent URL, then handle the callback.
+        </Typography>
+
+        <Paper sx={{ p: 3, mb: 3, bgcolor: "#f5f5f5" }}>
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>Step 1: Generate OAuth URL</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            POST to <code>/api/oauth/init</code> (no auth required):
+          </Typography>
+          <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2, mb: 2 }}>
+            <Typography component="pre" sx={{ m: 0, color: "#90caf9", fontFamily: "monospace", fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>
+{`const res = await fetch("${BASE}/api/oauth/init", {
+  method: "POST",
+  body: JSON.stringify({
+    service_name: "My App",
+    callback_URL: "https://myapp.com/api/oauth/callback",
+    redirect_after_success: "https://myapp.com/dashboard",
+    getUserId: true,
+    getUsername: true,
+    getBalance: false
+  })
+})
+const { generated_url } = await res.json()
+// Use generated_url as your "Sign In" button href`}
+            </Typography>
+          </Box>
+
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ mt: 3 }}>Step 2: Handle Callback</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            When the user confirms, we POST to your callback URL with their data:
+          </Typography>
+          <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2 }}>
+            <Typography component="pre" sx={{ m: 0, color: "#a5d6a7", fontFamily: "monospace", fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>
+{`POST /api/oauth/callback
+{
+  "success": true,
+  "user_data": {
+    "user_id": "uuid-here",
+    "username": "player1",
+    "balance": 45.67
+  }
+}`}
+            </Typography>
+          </Box>
+        </Paper>
       </Box>
 
       <Box sx={{ mt: 5, textAlign: "center" }}>
