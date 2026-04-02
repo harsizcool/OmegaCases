@@ -87,6 +87,8 @@ export default function MarketplacePage() {
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState("")
   const [revokeLoading, setRevokeLoading] = useState<string | null>(null)
+  const [removeAllConfirm, setRemoveAllConfirm] = useState(false)
+  const [removeAllLoading, setRemoveAllLoading] = useState(false)
 
   // Tick every second when my-listings dialog is open (for live cooldown countdown)
   useEffect(() => {
@@ -144,6 +146,30 @@ export default function MarketplacePage() {
       fetchListings(0, true)
     } finally {
       setRevokeLoading(null)
+    }
+  }
+
+  const handleRemoveAll = async () => {
+    if (!user) return
+    setRemoveAllLoading(true)
+    try {
+      const eligible = myListings.filter(
+        (l) => Date.now() - new Date(l.created_at).getTime() >= 45_000
+      )
+      await Promise.all(
+        eligible.map((l) =>
+          fetch(`/api/listings/${l.id}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: user.id }),
+          })
+        )
+      )
+      setRemoveAllConfirm(false)
+      await fetchMyListings()
+      fetchListings(0, true)
+    } finally {
+      setRemoveAllLoading(false)
     }
   }
 
@@ -446,7 +472,7 @@ export default function MarketplacePage() {
       </Sheet>
 
       {/* My Listings dialog */}
-      <Dialog open={myListingsOpen} onOpenChange={(v) => { if (!v) { setMyListingsOpen(false); setEditListingId(null); setEditError("") } }}>
+      <Dialog open={myListingsOpen} onOpenChange={(v) => { if (!v) { setMyListingsOpen(false); setEditListingId(null); setEditError(""); setRemoveAllConfirm(false) } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -571,8 +597,35 @@ export default function MarketplacePage() {
               </Alert>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMyListingsOpen(false)}>Close</Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {!removeAllConfirm ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:mr-auto"
+                  disabled={myListings.filter((l) => Date.now() - new Date(l.created_at).getTime() >= 45_000).length === 0}
+                  onClick={() => setRemoveAllConfirm(true)}
+                >
+                  <Trash2 size={13} className="mr-1.5" />
+                  Remove All ({myListings.filter((l) => Date.now() - new Date(l.created_at).getTime() >= 45_000).length} eligible)
+                </Button>
+                <Button variant="outline" onClick={() => setMyListingsOpen(false)}>Close</Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground sm:mr-auto self-center">
+                  Remove {myListings.filter((l) => Date.now() - new Date(l.created_at).getTime() >= 45_000).length} listings? This cannot be undone.
+                </p>
+                <Button variant="outline" onClick={() => setRemoveAllConfirm(false)} disabled={removeAllLoading}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleRemoveAll}
+                  disabled={removeAllLoading}
+                >
+                  {removeAllLoading ? <><Loader2 size={13} className="animate-spin mr-1.5" />Removing…</> : "Yes, Remove All"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

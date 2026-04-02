@@ -105,3 +105,28 @@ export const CASE_PRICES: CasePrice[] = [
 export const VALUE_RARITIES: Rarity[] = ["Legendary", "Omega"]
 
 export const ACCEPTED_CRYPTOS = ["BTC", "LTC", "SOL", "BCH"]
+
+export interface MessageSender {
+  id: string
+  username: string
+  profile_picture: string | null
+  plus: boolean
+}
+
+export interface Message {
+  id: string
+  sender_id: string
+  receiver_id: string | null
+  content: string
+  type: "dm" | "public"
+  read: boolean
+  created_at: string
+  sender?: MessageSender
+}
+
+export interface Conversation {
+  partner: MessageSender
+  last_message: string
+  last_at: string
+  unread: number
+}

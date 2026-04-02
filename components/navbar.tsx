@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X } from "lucide-react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -26,6 +26,7 @@ const NAV_LINKS = [
   { href: "/open",        label: "Cases",       icon: Layers },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
+  { href: "/chat",        label: "Chat",        icon: MessageSquare },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ]
 
@@ -206,6 +207,7 @@ export default function Navbar() {
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [pendingTrades, setPendingTrades] = useState(0)
+  const [unreadDMs, setUnreadDMs] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
   const { count: onlineCount, users: onlineUsers } = useOnlineUsers(user?.id, user?.username)
@@ -223,6 +225,20 @@ export default function Navbar() {
     }
     fetchPending()
     const interval = setInterval(fetchPending, 30000)
+    return () => clearInterval(interval)
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`/api/messages?unread_count=1&user_id=${user.id}`)
+        const data = res.ok ? await res.json() : {}
+        setUnreadDMs(data.unread ?? 0)
+      } catch {}
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 20000)
     return () => clearInterval(interval)
   }, [user])
 
@@ -287,6 +303,10 @@ export default function Navbar() {
           <nav className="hidden md:flex items-center gap-0.5 shrink-0">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => {
               const active = isActive(href)
+              const badge =
+                label === "Trade" && mounted && user && pendingTrades > 0 ? pendingTrades :
+                label === "Chat"  && mounted && user && unreadDMs > 0     ? unreadDMs :
+                null
               return (
                 <NextLink
                   key={href}
@@ -297,9 +317,9 @@ export default function Navbar() {
                 >
                   <Icon size={14} />
                   {label}
-                  {label === "Trade" && mounted && user && pendingTrades > 0 && (
+                  {badge !== null && (
                     <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5">
-                      {pendingTrades}
+                      {badge > 9 ? "9+" : badge}
                     </span>
                   )}
                 </NextLink>
@@ -427,6 +447,10 @@ export default function Navbar() {
                 <nav className="flex flex-col py-1">
                   {NAV_LINKS.map(({ href, label, icon: Icon }) => {
                     const active = isActive(href)
+                    const badge =
+                      label === "Trade" && mounted && user && pendingTrades > 0 ? pendingTrades :
+                      label === "Chat"  && mounted && user && unreadDMs > 0     ? unreadDMs :
+                      null
                     return (
                       <NextLink
                         key={href}
@@ -437,9 +461,9 @@ export default function Navbar() {
                         }`}
                       >
                         <span className="flex items-center gap-2.5"><Icon size={15} />{label}</span>
-                        {label === "Trade" && mounted && user && pendingTrades > 0 && (
+                        {badge !== null && (
                           <span className="min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-1">
-                            {pendingTrades}
+                            {badge > 9 ? "9+" : badge}
                           </span>
                         )}
                       </NextLink>
