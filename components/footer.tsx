@@ -25,7 +25,7 @@ export default function Footer() {
               {/* v2.0 tag */}
               <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/25 text-primary text-[0.6rem] font-bold rounded-full px-2 py-0.5">
                 <Star size={9} />
-                v2.1.0
+                v2.0.6
               </span>
             </div>
             <p className="text-xs text-muted-foreground">

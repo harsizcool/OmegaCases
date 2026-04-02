@@ -6,6 +6,7 @@ import Navbar from '@/components/navbar'
 import LiveRollsFeed from '@/components/live-rolls-feed'
 import DiscountBanner from '@/components/discount-banner'
 import FooterWrapper from '@/components/footer-wrapper'
+import PullToRefresh from '@/components/pull-to-refresh'
 import './globals.css'
 
 const LOGO =
@@ -74,6 +75,7 @@ export default function RootLayout({
             </div>
           </AppProvider>
         </NextThemesProvider>
+        <PullToRefresh />
         <Analytics />
       </body>
     </html>
