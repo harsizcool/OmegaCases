@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { filterChat } from "@/lib/chat-filter"
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
@@ -77,12 +78,15 @@ export async function POST(req: NextRequest) {
 
   const db = createClient()
 
+  // Apply word filter to public messages only (DMs are private)
+  const finalContent = type === "public" ? filterChat(content.trim()) : content.trim()
+
   const { data, error } = await db
     .from("messages")
     .insert({
       sender_id,
       receiver_id: type === "dm" ? receiver_id : null,
-      content: content.trim(),
+      content: finalContent,
       type,
     })
     .select("*, sender:sender_id(id, username, profile_picture, plus)")

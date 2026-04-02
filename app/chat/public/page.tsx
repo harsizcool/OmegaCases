@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import type { Message, MessageSender } from "@/lib/types"
+import { filterChat } from "@/lib/chat-filter"
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -228,7 +229,7 @@ export default function PublicChatPage() {
 
   const sendMessage = async () => {
     if (!user || !input.trim() || sending) return
-    const content = input.trim()
+    const content = filterChat(input.trim())
     setInput("")
     closeMention()
     setSending(true)
