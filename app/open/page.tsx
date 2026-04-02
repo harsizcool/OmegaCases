@@ -1,22 +1,19 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import {
-  Container, Box, Typography, Button, Grid, Card, CardContent,
-  Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, Divider, Badge, Switch, FormControlLabel,
-} from "@mui/material"
-import LockIcon from "@mui/icons-material/Lock"
-import InventoryIcon from "@mui/icons-material/Inventory"
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
-import SpeedIcon from "@mui/icons-material/Speed"
+import NextLink from "next/link"
+import { Lock, Package, ShoppingCart, Zap, Loader2, Crown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
+import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
 import CaseSpinner from "@/components/case-spinner"
 import Confetti from "@/components/confetti"
 import ItemCard from "@/components/item-card"
 import type { Item, Rarity, CasePrice } from "@/lib/types"
 import { RARITY_COLORS, CASE_PRICES } from "@/lib/types"
-import NextLink from "next/link"
 import { useMuteSounds } from "@/lib/use-mute-sounds"
 
 const CONFETTI_RARITIES: Rarity[] = ["Legendary", "Omega"]
@@ -48,7 +45,6 @@ export default function OpenPage() {
   const [error, setError] = useState("")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
 
-  // 2x speed toggle — persisted to localStorage
   const [doubleSpeed, setDoubleSpeed] = useState(false)
   useEffect(() => {
     try {
@@ -73,7 +69,6 @@ export default function OpenPage() {
   const selectedPrice = casePrices.find((p) => p.qty === selectedQty) ?? casePrices[0]
   const casesRemaining = user?.cases_remaining ?? 0
 
-  // Buy cases: deduct balance, add to cases_remaining only
   const handleBuyCases = async () => {
     if (!user) return
     if (Number(user.balance) < selectedPrice.price) {
@@ -101,7 +96,6 @@ export default function OpenPage() {
     }
   }
 
-  // Spin: consume 1 case_remaining, get 1 item
   const handleSpin = async () => {
     if (!user || casesRemaining < 1 || spinning) return
     setError("")
@@ -131,9 +125,6 @@ export default function OpenPage() {
     setLastWon(targetItem)
     setShowResult(true)
     setSpinning(false)
-
-    // Record roll AFTER animation — this triggers Realtime so live feed shows
-    // the result only after the roller has already seen it
     if (user?.id && wonItemId) {
       fetch("/api/rolls/record", {
         method: "POST",
@@ -141,7 +132,6 @@ export default function OpenPage() {
         body: JSON.stringify({ user_id: user.id, item_id: wonItemId }),
       }).catch(() => {})
     }
-
     if (CONFETTI_RARITIES.includes(targetItem.rarity as Rarity)) {
       setConfettiActive(true)
       if (!muted) {
@@ -162,61 +152,43 @@ export default function OpenPage() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <Confetti active={confettiActive} />
 
-      <Typography variant="h4" fontWeight={700} textAlign="center" gutterBottom>
-        Open Cases
-      </Typography>
+      <h1 className="text-3xl font-extrabold text-center mb-6">Open Cases</h1>
 
       {!user && (
-        <Box textAlign="center" sx={{ py: 6 }}>
-          <LockIcon sx={{ fontSize: 64, color: "primary.light", mb: 2 }} />
-          <Typography variant="h6" gutterBottom>Login to open cases</Typography>
-          <Button variant="contained" size="large" component={NextLink} href="/login" sx={{ mt: 1 }}>
-            Login / Register
-          </Button>
-        </Box>
+        <div className="flex flex-col items-center py-16 gap-4 text-center">
+          <Lock size={64} className="text-primary/40" />
+          <p className="text-lg font-semibold">Login to open cases</p>
+          <Button size="lg" asChild><NextLink href="/login">Login / Register</NextLink></Button>
+        </div>
       )}
 
       {user && (
         <>
-          {/* Balance + cases remaining bar */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 3,
-              mb: 4,
-              flexWrap: "wrap",
-            }}
-          >
-            <Chip
-              label={`Balance: $${Number(user.balance).toFixed(2)}`}
-              color="primary"
-              variant="outlined"
-              sx={{ fontSize: "1rem", px: 1, py: 2.5 }}
-            />
-            <Badge
-              badgeContent={casesRemaining > 0 ? casesRemaining : null}
-              color="error"
-              max={9999}
-            >
-              <Chip
-                icon={<InventoryIcon />}
-                label={casesRemaining > 0 ? `${casesRemaining} case${casesRemaining !== 1 ? "s" : ""} ready to open` : "No cases — buy some below"}
-                color={casesRemaining > 0 ? "success" : "default"}
-                variant={casesRemaining > 0 ? "filled" : "outlined"}
-                sx={{ fontSize: "1rem", px: 1, py: 2.5 }}
-              />
-            </Badge>
-          </Box>
+          {/* Balance + cases bar */}
+          <div className="flex justify-center gap-3 mb-6 flex-wrap">
+            <span className="text-sm font-semibold border border-primary text-primary rounded-full px-3 py-1.5">
+              Balance: ${Number(user.balance).toFixed(2)}
+            </span>
+            <span className={`text-sm font-semibold border rounded-full px-3 py-1.5 flex items-center gap-1.5 ${casesRemaining > 0 ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-950/20" : "border-border text-muted-foreground"}`}>
+              <Package size={14} />
+              {casesRemaining > 0
+                ? `${casesRemaining} case${casesRemaining !== 1 ? "s" : ""} ready to open`
+                : "No cases — buy some below"}
+            </span>
+          </div>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
           {/* Spinner */}
           {(spinning || showResult) && targetItem && (
-            <Box sx={{ mb: 4 }}>
+            <div className="mb-6">
               <CaseSpinner
                 items={items}
                 targetItem={targetItem}
@@ -225,188 +197,132 @@ export default function OpenPage() {
                 speed={doubleSpeed ? (user?.plus ? 3 : 2) : 1}
                 muted={muted}
               />
-            </Box>
+            </div>
           )}
 
           {/* Result card */}
           {showResult && lastWon && (
-            <Box
-              sx={{
-                textAlign: "center",
-                p: 3,
-                borderRadius: 3,
+            <div
+              className="text-center p-6 rounded-2xl mb-6 bg-muted/40"
+              style={{
                 border: `2px solid ${RARITY_COLORS[lastWon.rarity as Rarity]}`,
                 boxShadow: `0 0 24px ${RARITY_COLORS[lastWon.rarity as Rarity]}44`,
-                mb: 4,
-                bgcolor: "#f8fbff",
               }}
             >
-              <Typography variant="h6" fontWeight={700} gutterBottom>
-                You got:
-              </Typography>
-              <ItemCard item={lastWon} size="lg" showPrice />
-              <Chip
-                label={lastWon.rarity}
-                sx={{
-                  mt: 1,
-                  bgcolor: RARITY_COLORS[lastWon.rarity as Rarity],
-                  color: "#fff",
-                  fontWeight: 700,
-                }}
-              />
-              <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mt: 3 }}>
-                <Button
-                  variant="outlined"
-                  component={NextLink}
-                  href={`/user/${user.username}`}
-                >
-                  View Inventory
+              <p className="text-lg font-bold mb-3">You got:</p>
+              <div className="flex justify-center mb-2">
+                <ItemCard item={lastWon} size="lg" showPrice />
+              </div>
+              <span
+                className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: RARITY_COLORS[lastWon.rarity as Rarity] }}
+              >
+                {lastWon.rarity}
+              </span>
+              <div className="flex gap-3 justify-center mt-5">
+                <Button variant="outline" asChild>
+                  <NextLink href={`/user/${user.username}`}>View Inventory</NextLink>
                 </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleSpinAgain}
-                  disabled={(user.cases_remaining ?? 0) < 1}
-                >
+                <Button onClick={handleSpinAgain} disabled={(user.cases_remaining ?? 0) < 1}>
                   {(user.cases_remaining ?? 0) > 0
                     ? `Spin Again (${user.cases_remaining} left)`
                     : "No cases left"}
                 </Button>
-              </Box>
-            </Box>
+              </div>
+            </div>
           )}
 
-          {/* Spin button — shown when not spinning and no result showing */}
+          {/* Spin button */}
           {!spinning && !showResult && (
-            <Box textAlign="center" sx={{ mb: 5 }}>
+            <div className="text-center mb-8">
               <Button
-                variant="contained"
-                size="large"
+                size="lg"
                 onClick={handleSpin}
                 disabled={casesRemaining < 1 || spinLoading}
-                sx={{ px: 6, py: 1.5, fontSize: "1.1rem" }}
+                className="px-10 text-base"
               >
                 {spinLoading
-                  ? "Opening..."
+                  ? <><Loader2 size={16} className="animate-spin mr-2" />Opening...</>
                   : casesRemaining > 0
                   ? `Open a Case (${casesRemaining} remaining)`
                   : "Buy Cases Below to Spin"}
               </Button>
-              <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={doubleSpeed}
-                      onChange={toggleDoubleSpeed}
-                      size="small"
-                      color="warning"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <SpeedIcon fontSize="small" sx={{ color: doubleSpeed ? "warning.main" : "text.secondary" }} />
-                      <Typography variant="body2" color={doubleSpeed ? "warning.main" : "text.secondary"} fontWeight={doubleSpeed ? 700 : 400}>
-                        2x Speed
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
-            </Box>
+              <div className="flex justify-center items-center gap-2 mt-3">
+                <Switch checked={doubleSpeed} onCheckedChange={toggleDoubleSpeed} />
+                <span className={`text-sm font-medium flex items-center gap-1.5 ${doubleSpeed ? "text-amber-400" : "text-muted-foreground"}`}>
+                  <Zap size={14} />
+                  {user?.plus ? "3x Speed" : "2x Speed"}
+                </span>
+                {user?.plus && (
+                  <span className="inline-flex items-center gap-1 text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                    <Crown size={9} /> Plus
+                  </span>
+                )}
+              </div>
+            </div>
           )}
 
-          <Divider sx={{ mb: 4 }} />
+          <Separator className="mb-6" />
 
-          {/* Buy cases section */}
-          <Typography variant="h6" fontWeight={700} gutterBottom textAlign="center">
-            Buy Cases
-          </Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 3 }}>
-            Cases are added to your account. Each spin uses 1 case and wins 1 item.
-          </Typography>
+          {/* Buy cases */}
+          <h2 className="text-lg font-bold text-center mb-1">Buy Cases</h2>
+          <p className="text-sm text-muted-foreground text-center mb-4">Each spin uses 1 case and wins 1 item.</p>
 
-          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <div className="flex justify-center gap-3 mb-4 flex-wrap">
             {casePrices.map((preset) => (
-              <Card
+              <button
                 key={preset.qty}
                 onClick={() => !buyLoading && setSelectedQty(preset.qty)}
-                sx={{
-                  cursor: buyLoading ? "not-allowed" : "pointer",
-                  border: selectedQty === preset.qty ? "2px solid #1976d2" : "2px solid transparent",
-                  boxShadow: selectedQty === preset.qty ? "0 0 12px #1976d244" : undefined,
-                  transition: "all 0.15s",
-                  minWidth: 120,
-                }}
+                className={`min-w-[100px] rounded-xl border-2 px-4 py-3 text-center transition-all ${selectedQty === preset.qty ? "border-primary shadow-md shadow-primary/20" : "border-border hover:border-primary/50"} ${buyLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
               >
-                <CardContent sx={{ textAlign: "center", py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                  <Typography variant="h5" fontWeight={700} color="primary.main">
-                    x{preset.qty}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                    ${preset.price}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    ${(preset.price / preset.qty).toFixed(4)}/case
-                  </Typography>
-                </CardContent>
-              </Card>
+                <p className="text-xl font-extrabold text-primary">x{preset.qty}</p>
+                <p className="text-sm font-semibold text-muted-foreground">${preset.price}</p>
+                <p className="text-[0.65rem] text-muted-foreground">${(preset.price / preset.qty).toFixed(4)}/case</p>
+              </button>
             ))}
-          </Box>
+          </div>
 
-          <Box textAlign="center" sx={{ mb: 6 }}>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<ShoppingCartIcon />}
-              onClick={handleBuyCases}
-              disabled={buyLoading}
-              sx={{ px: 5, py: 1.5 }}
-            >
-              {buyLoading
-                ? "Buying..."
-                : `Buy x${selectedQty} Cases — $${selectedPrice.price}`}
+          <div className="flex justify-center mb-10">
+            <Button variant="outline" size="lg" onClick={handleBuyCases} disabled={buyLoading} className="px-8 gap-2">
+              {buyLoading ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />}
+              {buyLoading ? "Buying..." : `Buy x${selectedQty} Cases — $${selectedPrice.price}`}
             </Button>
-          </Box>
+          </div>
 
-          {/* Item pool preview */}
-          <Divider sx={{ mb: 4 }} />
-          <Typography variant="h6" fontWeight={700} gutterBottom>
-            Items in Pool
-          </Typography>
-          <Grid container spacing={2}>
+          <Separator className="mb-6" />
+
+          {/* Item pool */}
+          <h2 className="text-lg font-bold mb-4">Items in Pool</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {items.map((item) => (
-              <Grid item key={item.id} xs={6} sm={4} md={3} lg={2}>
-                <Box sx={{ textAlign: "center" }}>
-                  <ItemCard item={item} size="sm" showPrice />
-                  <Typography variant="caption" color="text.secondary">
-                    1 in {Math.round(100 / Number(item.likelihood))}
-                  </Typography>
-                </Box>
-              </Grid>
+              <div key={item.id} className="text-center">
+                <ItemCard item={item} size="sm" showPrice />
+                <p className="text-[0.65rem] text-muted-foreground mt-1">
+                  1 in {Math.round(100 / Number(item.likelihood))}
+                </p>
+              </div>
             ))}
-          </Grid>
+          </div>
         </>
       )}
 
       {/* Insufficient balance modal */}
-      <Dialog open={buyModalOpen} onClose={() => setBuyModalOpen(false)}>
-        <DialogTitle>Insufficient Balance</DialogTitle>
-        <DialogContent>
-          <Typography>
+      <Dialog open={buyModalOpen} onOpenChange={setBuyModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Insufficient Balance</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
             You need ${selectedPrice.price} to buy x{selectedQty} cases. Deposit more funds to continue.
-          </Typography>
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBuyModalOpen(false)}>Cancel</Button>
+            <Button asChild onClick={() => setBuyModalOpen(false)}>
+              <NextLink href="/?deposit=1">Deposit</NextLink>
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBuyModalOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            component={NextLink}
-            href="/?deposit=1"
-            onClick={() => setBuyModalOpen(false)}
-          >
-            Deposit
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   )
 }

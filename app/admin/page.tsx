@@ -1,16 +1,15 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import {
-  Container, Box, Typography, Button, Card, CardContent, CardMedia,
-  TextField, Select, MenuItem, FormControl, InputLabel, Grid,
-  Alert, CircularProgress, Chip, Tab, Tabs, Slider, Tooltip,
-} from "@mui/material"
-import AddIcon from "@mui/icons-material/Add"
-import UploadIcon from "@mui/icons-material/Upload"
-import SaveIcon from "@mui/icons-material/Save"
+import { Plus, Upload, Save, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
-import { createClient as createBrowserClient } from "@/lib/supabase/client"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import { useRouter } from "next/navigation"
@@ -25,11 +24,8 @@ function getRecommendedRarity(pct: number): string {
   return "Omega"
 }
 
-// Convert slider value (0–1000) to percentage
-// Slider 0–1000 maps to 0.002%–100% on a log scale
 function sliderToPercent(val: number): number {
   if (val === 0) return 0.002
-  // Logarithmic: slider 1000 = 100%, slider 0 = 0.002%
   const min = Math.log(0.002)
   const max = Math.log(100)
   return parseFloat(Math.exp(min + (val / 1000) * (max - min)).toFixed(6))
@@ -49,7 +45,6 @@ export default function AdminPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Settings tab state
   const RARITIES_LIST = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
   const DEFAULT_CAPS: Record<string, number> = { Common: 0.04, Uncommon: 0.10, Rare: 0.40, Legendary: 2.00, Omega: 800 }
   const [caps, setCaps] = useState<Record<string, number>>(DEFAULT_CAPS)
@@ -58,21 +53,18 @@ export default function AdminPage() {
   const [capsError, setCapsError] = useState("")
   const [capsSuccess, setCapsSuccess] = useState(false)
 
-  // Banner state
   const [bannerText, setBannerText] = useState("")
   const [bannerColor, setBannerColor] = useState("#1565c0")
   const [bannerSaving, setBannerSaving] = useState(false)
   const [bannerSuccess, setBannerSuccess] = useState(false)
   const [bannerError, setBannerError] = useState("")
 
-  // Case prices state
   const DEFAULT_CASE_PRICES = [{ qty: 10, price: 0.39 }, { qty: 100, price: 2.99 }, { qty: 1000, price: 9.99 }]
   const [casePrices, setCasePrices] = useState(DEFAULT_CASE_PRICES)
   const [cpSaving, setCpSaving] = useState(false)
   const [cpSuccess, setCpSuccess] = useState(false)
   const [cpError, setCpError] = useState("")
 
-  // Payments paused state
   const [paymentsPaused, setPaymentsPaused] = useState(true)
   const [ppSaving, setPpSaving] = useState(false)
   const [ppSuccess, setPpSuccess] = useState(false)
@@ -121,8 +113,6 @@ export default function AdminPage() {
     } catch (e: any) { setBannerError(e.message) } finally { setBannerSaving(false) }
   }
 
-  // Load banner in loadCaps
-
   const [name, setName] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -137,16 +127,8 @@ export default function AdminPage() {
   const [createSuccess, setCreateSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const likelihood = sliderVal <= 0
-    ? 0.002
-    : customPct !== "" && sliderVal === 0
-      ? parseFloat(customPct) || 0.002
-      : sliderToPercent(sliderVal)
-
-  // Threshold: show custom text field when slider <= threshold for 0.1% (1 in 1000)
   const CUSTOM_THRESHOLD = percentToSlider(0.1)
   const showCustomInput = sliderVal <= CUSTOM_THRESHOLD
-
   const displayPct = showCustomInput && customPct !== "" ? parseFloat(customPct) || 0 : sliderToPercent(sliderVal)
   const oneIn = displayPct > 0 ? Math.round(100 / displayPct) : 50000
   const recommended = getRecommendedRarity(displayPct)
@@ -173,9 +155,7 @@ export default function AdminPage() {
   }
 
   const saveCaps = async () => {
-    setCapsSaving(true)
-    setCapsError("")
-    setCapsSuccess(false)
+    setCapsSaving(true); setCapsError(""); setCapsSuccess(false)
     try {
       if (!user?.id) throw new Error("Not authenticated")
       const res = await fetch("/api/admin/settings", {
@@ -183,16 +163,9 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "rarity_price_caps", value: caps, user_id: user.id }),
       })
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || "Failed to save")
-      }
+      if (!res.ok) { const body = await res.json(); throw new Error(body.error || "Failed to save") }
       setCapsSuccess(true)
-    } catch (e: any) {
-      setCapsError(e.message)
-    } finally {
-      setCapsSaving(false)
-    }
+    } catch (e: any) { setCapsError(e.message) } finally { setCapsSaving(false) }
   }
 
   useEffect(() => {
@@ -228,28 +201,17 @@ export default function AdminPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    setCreateError("")
-    setCreateSuccess(false)
-    setCreating(true)
+    setCreateError(""); setCreateSuccess(false); setCreating(true)
     try {
       const finalUrl = await uploadImage()
       if (!finalUrl) { setCreating(false); return }
-
       const finalLikelihood = showCustomInput && customPct !== ""
         ? Math.min(Math.max(parseFloat(customPct) || 0.002, 0.002), 100)
         : sliderToPercent(sliderVal)
-
       const res = await fetch("/api/admin/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user!.id,
-          name,
-          image_url: finalUrl,
-          rarity,
-          likelihood: finalLikelihood,
-          market_price: parseFloat(marketPrice) || 0,
-        }),
+        body: JSON.stringify({ user_id: user!.id, name, image_url: finalUrl, rarity, likelihood: finalLikelihood, market_price: parseFloat(marketPrice) || 0 }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -257,378 +219,333 @@ export default function AdminPage() {
       setName(""); setImageUrl(""); setImageFile(null); setImagePreview(""); setMarketPrice("")
       setSliderVal(percentToSlider(10)); setCustomPct("")
       loadItems()
-    } catch (e: any) {
-      setCreateError(e.message)
-    } finally {
-      setCreating(false)
-    }
+    } catch (e: any) { setCreateError(e.message) } finally { setCreating(false) }
   }
 
-  if (!user) return <Box textAlign="center" py={8}><CircularProgress /></Box>
+  if (!user) return <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-muted-foreground" /></div>
   if (!user.admin) return null
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight={700} gutterBottom>Admin Panel</Typography>
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-        <Tab label="Items" />
-        <Tab label="Add Item" />
-        <Tab label="Settings" />
-      </Tabs>
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-5">Admin Panel</h1>
 
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6">
+        {["Items", "Add Item", "Settings"].map((label, i) => (
+          <button
+            key={label}
+            onClick={() => setTab(i)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === i ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Items tab */}
       {tab === 0 && (
         <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {items.length} items in pool
-          </Typography>
-          {loading ? <CircularProgress /> : (
-            <Grid container spacing={2}>
+          <p className="text-sm text-muted-foreground mb-4">{items.length} items in pool</p>
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 size={28} className="animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {items.map((item) => {
                 const color = RARITY_COLORS[item.rarity as Rarity]
                 const chance = Number(item.likelihood)
                 const oneInVal = chance > 0 ? Math.round(100 / chance) : 0
                 return (
-                  <Grid item key={item.id} xs={6} sm={4} md={3} lg={2}>
-                    <Card sx={{ border: `1px solid ${color}44` }}>
-                      <CardMedia
-                        component="img"
-                        image={item.image_url}
-                        alt={item.name}
-                        sx={{ height: 100, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                      />
-                      <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                        <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                        <Tooltip title={item.name} placement="top" arrow>
-                          <Typography variant="caption" display="block" fontWeight={600}
-                            sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {item.name}
-                          </Typography>
+                  <div key={item.id} className="border rounded-xl overflow-hidden" style={{ borderColor: `${color}44` }}>
+                    <img src={item.image_url} alt={item.name} className="w-full h-[90px] object-contain p-1.5 bg-muted" />
+                    <div className="p-2">
+                      <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full text-white mb-1 inline-block" style={{ backgroundColor: color }}>{item.rarity}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="text-xs font-semibold truncate">{item.name}</p>
+                          </TooltipTrigger>
+                          <TooltipContent>{item.name}</TooltipContent>
                         </Tooltip>
-                        <Typography variant="caption" color="text.secondary">
-                          {chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="primary.main">
-                          ${Number(item.market_price).toFixed(2)}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+                      </TooltipProvider>
+                      <p className="text-xs text-muted-foreground">{chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}</p>
+                      <p className="text-xs font-bold text-primary">${Number(item.market_price).toFixed(2)}</p>
+                    </div>
+                  </div>
                 )
               })}
-            </Grid>
+            </div>
           )}
         </>
       )}
 
+      {/* Add Item tab */}
       {tab === 1 && (
-        <Card sx={{ maxWidth: 560 }}>
-          <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>New Item</Typography>
-            <Box component="form" onSubmit={handleCreate} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required fullWidth />
+        <div className="max-w-lg border border-border rounded-2xl p-6">
+          <h2 className="text-lg font-bold mb-4">New Item</h2>
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
 
-              {/* Image: file upload OR URL */}
-              <Box>
-                <Typography variant="body2" gutterBottom fontWeight={600}>Item Image</Typography>
-                <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<UploadIcon />}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Upload File
-                  </Button>
-                  <Typography variant="caption" color="text.secondary">or paste URL below</Typography>
-                </Box>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
+            {/* Image */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="font-semibold">Item Image</Label>
+              <div className="flex gap-2 items-center flex-wrap">
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()}>
+                  <Upload size={13} /> Upload File
+                </Button>
+                <span className="text-xs text-muted-foreground">or paste URL below</span>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              {!imageFile && (
+                <Input
+                  placeholder="Image URL (PNG, GIF, WEBP)"
+                  value={imageUrl}
+                  onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value) }}
                 />
-                {!imageFile && (
-                  <TextField
-                    label="Image URL"
-                    value={imageUrl}
-                    onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value) }}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                    helperText="PNG, GIF, or WEBP. Animated GIFs loop automatically."
-                  />
-                )}
-                {imageFile && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                    <Chip label={imageFile.name} size="small" onDelete={() => { setImageFile(null); setImagePreview("") }} />
-                  </Box>
-                )}
-                {imagePreview && (
-                  <Box component="img" src={imagePreview} alt="preview"
-                    sx={{ mt: 1, width: 100, height: 100, objectFit: "contain", border: "1px solid #e3f2fd", borderRadius: 1 }} />
-                )}
-              </Box>
+              )}
+              {imageFile && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium border border-border rounded px-2 py-0.5">{imageFile.name}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => { setImageFile(null); setImagePreview("") }}>Remove</Button>
+                </div>
+              )}
+              {imagePreview && (
+                <img src={imagePreview} alt="preview" className="w-24 h-24 object-contain border border-border rounded-lg mt-1" />
+              )}
+            </div>
 
-              <FormControl fullWidth>
-                <InputLabel>Rarity</InputLabel>
-                <Select value={rarity} onChange={(e) => setRarity(e.target.value)} label="Rarity">
+            {/* Rarity */}
+            <div className="flex flex-col gap-1.5">
+              <Label>Rarity</Label>
+              <Select value={rarity} onValueChange={setRarity}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {RARITIES.map((r) => (
-                    <MenuItem key={r} value={r}>
-                      <Chip label={r} size="small" sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", mr: 1, fontSize: "0.65rem" }} />
-                      {r}
-                    </MenuItem>
+                    <SelectItem key={r} value={r}>
+                      <span className="flex items-center gap-2">
+                        <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: RARITY_COLORS[r as Rarity] }}>{r}</span>
+                        {r}
+                      </span>
+                    </SelectItem>
                   ))}
-                </Select>
-              </FormControl>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <Box>
-                <Typography variant="body2" gutterBottom>
-                  Likelihood:{" "}
-                  <strong>
-                    {displayPct < 0.1
-                      ? `${displayPct.toFixed(4)}% (1 in ${oneIn.toLocaleString()})`
-                      : `${displayPct.toFixed(2)}% (1 in ${oneIn.toLocaleString()})`}
-                  </strong>
-                </Typography>
-                <Slider
-                  value={sliderVal}
-                  onChange={(_, v) => {
-                    setSliderVal(v as number)
-                    setCustomPct("")
-                  }}
-                  min={0}
-                  max={1000}
-                  step={1}
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                  Drag left for rarer. Max rarity: 1 in 50,000.
-                </Typography>
-                {showCustomInput && (
-                  <TextField
-                    label="Custom Likelihood (%)"
-                    size="small"
+            {/* Likelihood slider */}
+            <div className="flex flex-col gap-1.5">
+              <Label>
+                Likelihood:{" "}
+                <strong>
+                  {displayPct < 0.1
+                    ? `${displayPct.toFixed(4)}% (1 in ${oneIn.toLocaleString()})`
+                    : `${displayPct.toFixed(2)}% (1 in ${oneIn.toLocaleString()})`}
+                </strong>
+              </Label>
+              <input
+                type="range"
+                value={sliderVal}
+                onChange={(e) => { setSliderVal(Number(e.target.value)); setCustomPct("") }}
+                min={0} max={1000} step={1}
+                className="w-full accent-primary"
+              />
+              <p className="text-xs text-muted-foreground">Drag left for rarer. Max rarity: 1 in 50,000.</p>
+              {showCustomInput && (
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Custom Likelihood (%)</Label>
+                  <Input
                     type="number"
                     value={customPct}
                     onChange={(e) => setCustomPct(e.target.value)}
-                    inputProps={{ min: 0.002, max: 0.1, step: 0.001 }}
-                    helperText="Enter a percentage (e.g. 0.05 = 1 in 2,000). Min: 0.002% (1 in 50,000)."
-                    fullWidth
+                    min={0.002} max={0.1} step={0.001}
+                    placeholder="e.g. 0.05"
                   />
-                )}
-                <Chip
-                  label={`Recommended: ${recommended}`}
-                  size="small"
-                  sx={{ bgcolor: RARITY_COLORS[recommended as Rarity], color: "#fff", fontSize: "0.65rem", mt: 1 }}
-                />
-              </Box>
+                  <p className="text-xs text-muted-foreground">Min: 0.002% (1 in 50,000).</p>
+                </div>
+              )}
+              <span
+                className="text-xs font-bold px-1.5 py-0.5 rounded-full text-white self-start"
+                style={{ backgroundColor: RARITY_COLORS[recommended as Rarity] }}
+              >
+                Recommended: {recommended}
+              </span>
+            </div>
 
-              <TextField
-                label="Market Price (USD)"
+            {/* Market price */}
+            <div className="flex flex-col gap-1.5">
+              <Label>Market Price (USD)</Label>
+              <Input
                 type="number"
                 value={marketPrice}
                 onChange={(e) => setMarketPrice(e.target.value)}
-                inputProps={{ min: 0, step: 0.01 }}
-                fullWidth
+                min={0} step={0.01}
               />
-              {createError && <Alert severity="error">{createError}</Alert>}
-              {createSuccess && <Alert severity="success">Item created!</Alert>}
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={imageUploading ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <AddIcon />}
-                disabled={creating || imageUploading}
-              >
-                {creating || imageUploading ? "Creating..." : "Create Item"}
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+            </div>
+
+            {createError && <Alert variant="destructive"><AlertDescription>{createError}</AlertDescription></Alert>}
+            {createSuccess && <Alert><AlertDescription className="text-green-600">Item created!</AlertDescription></Alert>}
+
+            <Button type="submit" disabled={creating || imageUploading} className="gap-2">
+              {(creating || imageUploading) ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {(creating || imageUploading) ? "Creating..." : "Create Item"}
+            </Button>
+          </form>
+        </div>
       )}
 
+      {/* Settings tab */}
       {tab === 2 && (
-        <Card sx={{ maxWidth: 480 }}>
-          <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>Game Settings</Typography>
+        <div className="max-w-md flex flex-col gap-6">
+          {/* Payments toggle */}
+          <div
+            className="rounded-xl border p-4"
+            style={{ borderColor: paymentsPaused ? "#ef444466" : "#22c55e66", backgroundColor: paymentsPaused ? "rgba(239,68,68,0.05)" : "rgba(34,197,94,0.05)" }}
+          >
+            <h3 className="text-sm font-bold mb-1">Deposits &amp; Withdrawals</h3>
+            <p className="text-xs text-muted-foreground mb-3">When paused, all deposit and withdrawal requests are rejected with a maintenance message.</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${paymentsPaused ? "bg-red-100 text-red-700 dark:bg-red-900/20" : "bg-green-100 text-green-700 dark:bg-green-900/20"}`}>
+                {paymentsPaused ? "PAUSED" : "ACTIVE"}
+              </span>
+              <Button
+                size="sm"
+                variant={paymentsPaused ? "default" : "destructive"}
+                className="gap-1.5"
+                disabled={ppSaving}
+                onClick={() => savePaymentsPaused(!paymentsPaused)}
+              >
+                {ppSaving && <Loader2 size={12} className="animate-spin" />}
+                {ppSaving ? "Saving..." : paymentsPaused ? "Resume Payments" : "Pause Payments"}
+              </Button>
+            </div>
+            {ppError && <Alert variant="destructive" className="mt-2"><AlertDescription>{ppError}</AlertDescription></Alert>}
+            {ppSuccess && <Alert className="mt-2"><AlertDescription className="text-green-600">Payments setting saved!</AlertDescription></Alert>}
+          </div>
 
-            {/* Payments Toggle */}
-            <Box sx={{ mb: 4, p: 2, border: "1px solid", borderColor: paymentsPaused ? "error.light" : "success.light", borderRadius: 2, bgcolor: paymentsPaused ? "rgba(211,47,47,0.05)" : "rgba(46,125,50,0.05)" }}>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom>Deposits &amp; Withdrawals</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                When paused, all deposit and withdrawal requests are rejected with a maintenance message.
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-                <Chip
-                  label={paymentsPaused ? "PAUSED" : "ACTIVE"}
-                  color={paymentsPaused ? "error" : "success"}
-                  size="small"
-                  sx={{ fontWeight: 700 }}
-                />
-                <Button
-                  variant="contained"
-                  color={paymentsPaused ? "success" : "error"}
-                  size="small"
-                  disabled={ppSaving}
-                  onClick={() => savePaymentsPaused(!paymentsPaused)}
-                  startIcon={ppSaving ? <CircularProgress size={14} sx={{ color: "inherit" }} /> : null}
-                >
-                  {ppSaving ? "Saving..." : paymentsPaused ? "Resume Payments" : "Pause Payments"}
-                </Button>
-              </Box>
-              {ppError && <Alert severity="error" sx={{ mt: 1 }}>{ppError}</Alert>}
-              {ppSuccess && <Alert severity="success" sx={{ mt: 1 }}>Payments setting saved!</Alert>}
-            </Box>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Set the maximum listing price allowed per rarity on the marketplace.
-            </Typography>
-            {capsLoading ? <CircularProgress /> : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {/* Rarity price caps */}
+          <div>
+            <h3 className="text-sm font-bold mb-1">Rarity Price Caps</h3>
+            <p className="text-xs text-muted-foreground mb-3">Max listing price per rarity on the marketplace.</p>
+            {capsLoading ? (
+              <Loader2 size={20} className="animate-spin text-muted-foreground" />
+            ) : (
+              <div className="flex flex-col gap-2">
                 {RARITIES_LIST.map((r) => (
-                  <Box key={r} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Chip
-                      label={r}
-                      size="small"
-                      sx={{ bgcolor: RARITY_COLORS[r as Rarity], color: "#fff", width: 90, flexShrink: 0 }}
-                    />
-                    <TextField
-                      label="Max Price ($)"
+                  <div key={r} className="flex items-center gap-3">
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full text-white shrink-0 w-24 text-center"
+                      style={{ backgroundColor: RARITY_COLORS[r as Rarity] }}
+                    >{r}</span>
+                    <Input
                       type="number"
-                      size="small"
                       value={caps[r] ?? ""}
                       onChange={(e) => setCaps((prev) => ({ ...prev, [r]: parseFloat(e.target.value) || 0 }))}
-                      inputProps={{ min: 0.01, step: 0.01 }}
-                      sx={{ flex: 1 }}
+                      min={0.01} step={0.01}
+                      className="h-8 text-sm"
                     />
-                  </Box>
+                  </div>
                 ))}
-                {capsError && <Alert severity="error">{capsError}</Alert>}
-                {capsSuccess && <Alert severity="success">Settings saved!</Alert>}
-                <Button
-                  variant="contained"
-                  startIcon={capsSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
-                  disabled={capsSaving}
-                  onClick={saveCaps}
-                >
+                {capsError && <Alert variant="destructive"><AlertDescription>{capsError}</AlertDescription></Alert>}
+                {capsSuccess && <Alert><AlertDescription className="text-green-600">Settings saved!</AlertDescription></Alert>}
+                <Button className="gap-2 self-start" disabled={capsSaving} onClick={saveCaps}>
+                  {capsSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {capsSaving ? "Saving..." : "Save Settings"}
                 </Button>
-              </Box>
+              </div>
             )}
+          </div>
 
-            {/* Case Prices */}
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" fontWeight={700} gutterBottom>Case Prices</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Set how much each bundle of cases costs. Defaults: 10 for $0.39, 100 for $2.99, 1000 for $9.99.
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {casePrices.map((cp, i) => (
-                  <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <TextField
-                      label="Qty"
+          <Separator />
+
+          {/* Case prices */}
+          <div>
+            <h3 className="text-sm font-bold mb-1">Case Prices</h3>
+            <p className="text-xs text-muted-foreground mb-3">Defaults: 10 for $0.39, 100 for $2.99, 1000 for $9.99.</p>
+            <div className="flex flex-col gap-2">
+              {casePrices.map((cp, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div>
+                    <Label className="text-xs">Qty</Label>
+                    <Input
                       type="number"
                       value={cp.qty}
-                      onChange={(e) => {
-                        const next = [...casePrices]
-                        next[i] = { ...next[i], qty: Number(e.target.value) }
-                        setCasePrices(next)
-                      }}
-                      inputProps={{ min: 1, step: 1 }}
-                      sx={{ width: 120 }}
-                      size="small"
+                      onChange={(e) => { const next = [...casePrices]; next[i] = { ...next[i], qty: Number(e.target.value) }; setCasePrices(next) }}
+                      min={1} step={1}
+                      className="w-24 h-8 text-sm"
                     />
-                    <TextField
-                      label="Price ($)"
+                  </div>
+                  <div>
+                    <Label className="text-xs">Price ($)</Label>
+                    <Input
                       type="number"
                       value={cp.price}
-                      onChange={(e) => {
-                        const next = [...casePrices]
-                        next[i] = { ...next[i], price: Number(e.target.value) }
-                        setCasePrices(next)
-                      }}
-                      inputProps={{ min: 0, step: 0.01 }}
-                      sx={{ width: 140 }}
-                      size="small"
-                      InputProps={{ startAdornment: <Typography variant="body2" sx={{ mr: 0.5 }}>$</Typography> }}
+                      onChange={(e) => { const next = [...casePrices]; next[i] = { ...next[i], price: Number(e.target.value) }; setCasePrices(next) }}
+                      min={0} step={0.01}
+                      className="w-28 h-8 text-sm"
                     />
-                    <Button
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      disabled={casePrices.length <= 1}
-                      onClick={() => setCasePrices(casePrices.filter((_, j) => j !== i))}
-                    >
-                      Remove
-                    </Button>
-                  </Box>
-                ))}
-                <Box>
+                  </div>
                   <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setCasePrices([...casePrices, { qty: 0, price: 0 }])}
-                  >
-                    + Add Tier
-                  </Button>
-                </Box>
-                {cpError && <Alert severity="error">{cpError}</Alert>}
-                {cpSuccess && <Alert severity="success">Case prices saved!</Alert>}
-                <Button
-                  variant="contained"
-                  startIcon={cpSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
-                  disabled={cpSaving}
-                  onClick={saveCasePrices}
-                  sx={{ alignSelf: "flex-start" }}
-                >
-                  {cpSaving ? "Saving..." : "Save Case Prices"}
-                </Button>
-              </Box>
-            </Box>
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive border-destructive mt-4"
+                    disabled={casePrices.length <= 1}
+                    onClick={() => setCasePrices(casePrices.filter((_, j) => j !== i))}
+                  >Remove</Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setCasePrices([...casePrices, { qty: 0, price: 0 }])}>
+                + Add Tier
+              </Button>
+              {cpError && <Alert variant="destructive"><AlertDescription>{cpError}</AlertDescription></Alert>}
+              {cpSuccess && <Alert><AlertDescription className="text-green-600">Case prices saved!</AlertDescription></Alert>}
+              <Button className="gap-2 self-start" disabled={cpSaving} onClick={saveCasePrices}>
+                {cpSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {cpSaving ? "Saving..." : "Save Case Prices"}
+              </Button>
+            </div>
+          </div>
 
-            {/* Banner */}            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" fontWeight={700} gutterBottom>Site Banner</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Shown at the top of every page. Leave text empty to hide the banner.
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <TextField
-                  label="Banner Text"
-                  value={bannerText}
-                  onChange={(e) => setBannerText(e.target.value)}
-                  fullWidth
-                  placeholder="Leave empty to hide banner"
-                  helperText="Leave blank to remove the banner entirely"
+          <Separator />
+
+          {/* Banner */}
+          <div>
+            <h3 className="text-sm font-bold mb-1">Site Banner</h3>
+            <p className="text-xs text-muted-foreground mb-3">Shown at the top of every page. Leave text empty to hide.</p>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Banner Text</Label>
+                <Input value={bannerText} onChange={(e) => setBannerText(e.target.value)} placeholder="Leave empty to hide banner" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Label className="shrink-0">Background Color</Label>
+                <input
+                  type="color"
+                  value={bannerColor}
+                  onChange={(e) => setBannerColor(e.target.value)}
+                  className="w-10 h-8 border-none rounded cursor-pointer p-0.5"
                 />
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>Background Color</Typography>
-                  <input
-                    type="color"
-                    value={bannerColor}
-                    onChange={(e) => setBannerColor(e.target.value)}
-                    style={{ width: 48, height: 36, border: "none", borderRadius: 6, cursor: "pointer", padding: 2 }}
-                  />
-                  <Typography variant="body2" color="text.secondary">{bannerColor}</Typography>
-                </Box>
-                {bannerText && (
-                  <Box sx={{ bgcolor: bannerColor, color: "#fff", py: 0.75, px: 2, borderRadius: 1, textAlign: "center" }}>
-                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.8rem" }}>{bannerText}</Typography>
-                  </Box>
-                )}
-                {bannerError && <Alert severity="error">{bannerError}</Alert>}
-                {bannerSuccess && <Alert severity="success">Banner saved!</Alert>}
-                <Button
-                  variant="contained"
-                  startIcon={bannerSaving ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <SaveIcon />}
-                  disabled={bannerSaving}
-                  onClick={saveBanner}
-                >
-                  {bannerSaving ? "Saving..." : "Save Banner"}
-                </Button>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+                <span className="text-sm text-muted-foreground">{bannerColor}</span>
+              </div>
+              {bannerText && (
+                <div className="rounded-lg py-2 px-4 text-center" style={{ backgroundColor: bannerColor }}>
+                  <p className="text-sm font-bold text-white">{bannerText}</p>
+                </div>
+              )}
+              {bannerError && <Alert variant="destructive"><AlertDescription>{bannerError}</AlertDescription></Alert>}
+              {bannerSuccess && <Alert><AlertDescription className="text-green-600">Banner saved!</AlertDescription></Alert>}
+              <Button className="gap-2 self-start" disabled={bannerSaving} onClick={saveBanner}>
+                {bannerSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {bannerSaving ? "Saving..." : "Save Banner"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
-    </Container>
+    </div>
   )
 }

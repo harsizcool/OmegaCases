@@ -2,58 +2,24 @@
 
 import { useState } from "react"
 import NextLink from "next/link"
-import {
-  Container, Box, Typography, Button, Paper, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, CircularProgress, Divider, List, ListItem,
-  ListItemIcon, ListItemText,
-} from "@mui/material"
-import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
-import SpeedIcon from "@mui/icons-material/Speed"
-import PaletteIcon from "@mui/icons-material/Palette"
-import ApiIcon from "@mui/icons-material/Api"
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet"
-import StarIcon from "@mui/icons-material/Star"
-import CasinoIcon from "@mui/icons-material/Casino"
-import LockOpenIcon from "@mui/icons-material/LockOpen"
-import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { Loader2, Crown, Zap, Star, Wallet, Code2, Dice6, LockOpen, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/lib/auth-context"
 
 const PLUS_PRICE = 2.99
 const PLUS_COLOR = "#f59e0b"
 
 const BENEFITS = [
-  {
-    icon: <CasinoIcon />,
-    title: "250 free spins right away",
-    desc: "They land in your account the second you buy. No waiting.",
-    highlight: true,
-  },
-  {
-    icon: <SpeedIcon />,
-    title: "3x spin speed",
-    desc: "Cases animate at triple speed. Opens way faster.",
-  },
-  {
-    icon: <StarIcon />,
-    title: "Plus badge on your profile",
-    desc: "Shows up next to your name on the leaderboard, search, trades, and your profile page.",
-  },
-  {
-    icon: <AccountBalanceWalletIcon />,
-    title: "More ways to cash out",
-    desc: "Unlock PayPal (min $10), Xbox Gift Cards, and PlayStation Gift Cards as withdrawal options.",
-  },
-  {
-    icon: <PaletteIcon />,
-    title: "Dark mode",
-    desc: "Flip the whole site to dark in Settings. Your call.",
-  },
-  {
-    icon: <ApiIcon />,
-    title: "API access",
-    desc: "Grab item data, roll history, and more via our developer API. Docs at /plus/docs.",
-  },
+  { icon: <Dice6 size={20} />, title: "250 free spins right away", desc: "They land in your account the second you buy. No waiting.", highlight: true },
+  { icon: <Zap size={20} />, title: "3x spin speed", desc: "Cases animate at triple speed. Opens way faster." },
+  { icon: <Star size={20} />, title: "Plus badge on your profile", desc: "Shows up next to your name on the leaderboard, search, trades, and your profile page." },
+  { icon: <Wallet size={20} />, title: "More ways to cash out", desc: "Unlock PayPal (min $10), Xbox Gift Cards, and PlayStation Gift Cards as withdrawal options." },
+  { icon: <Code2 size={20} />, title: "API access", desc: "Grab item data, roll history, and more via our developer API. Docs at /plus/docs." },
+  { icon: <Users size={20} />, title: "Referral Codes", desc: "Earn 25% of all case + Plus purchases from users you refer. Passive income forever.", soon: true },
 ]
 
 export default function PlusPage() {
@@ -89,186 +55,129 @@ export default function PlusPage() {
   const alreadyPlus = user?.plus
 
   return (
-    <Container maxWidth="sm" sx={{ py: 5 }}>
+    <div className="max-w-lg mx-auto px-4 py-10">
       {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
-        <Box
-          component="img"
+      <div className="flex items-center gap-3 mb-6">
+        <img
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OmegaCases%20Plus-l4Y0s1RZoFE6qYuGtIWUKCXNP7jTq1.webp"
           alt="OmegaCases Plus"
-          sx={{ width: 56, height: 56 }}
+          className="w-14 h-14"
         />
-        <Box>
-          <Typography variant="h4" fontWeight={800} sx={{ color: PLUS_COLOR, lineHeight: 1.1 }}>
-            OmegaCases Plus
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            One-time payment. Keeps forever.
-          </Typography>
-        </Box>
-      </Box>
+        <div>
+          <h1 className="text-3xl font-extrabold leading-tight" style={{ color: PLUS_COLOR }}>OmegaCases Plus</h1>
+          <p className="text-sm text-muted-foreground">One-time payment. Keeps forever.</p>
+        </div>
+      </div>
 
-      {/* Already Plus */}
       {alreadyPlus && (
-        <Alert
-          severity="success"
-          icon={<WorkspacePremiumIcon />}
-          sx={{ mb: 3, borderRadius: 1 }}
-        >
-          <Typography fontWeight={700}>You already have Plus — nice.</Typography>
-          <Typography variant="body2">Everything below is already active on your account.</Typography>
+        <Alert className="mb-4">
+          <Crown size={14} className="text-amber-500" />
+          <AlertDescription>
+            <p className="font-bold">You already have Plus — nice.</p>
+            <p className="text-sm">Everything below is already active on your account.</p>
+          </AlertDescription>
         </Alert>
       )}
-
-      {/* Success */}
       {success && (
-        <Alert severity="success" sx={{ mb: 3, borderRadius: 1 }}>
-          <Typography fontWeight={700}>You're in!</Typography>
-          <Typography variant="body2">250 spins added. All Plus perks are now active.</Typography>
+        <Alert className="mb-4">
+          <AlertDescription>
+            <p className="font-bold text-green-600">You're in!</p>
+            <p className="text-sm">250 spins added. All Plus perks are now active.</p>
+          </AlertDescription>
         </Alert>
       )}
 
       {/* Benefits */}
-      <Paper
-        elevation={0}
-        sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 2,
-          overflow: "hidden",
-          mb: 4,
-        }}
-      >
-        <Box sx={{ bgcolor: PLUS_COLOR, px: 3, py: 1.75 }}>
-          <Typography variant="subtitle1" fontWeight={700} color="#fff">
-            What you get
-          </Typography>
-        </Box>
-        <List disablePadding>
-          {BENEFITS.map((b, i) => (
-            <Box key={i}>
-              {i > 0 && <Divider />}
-              <ListItem
-                sx={{
-                  px: 3,
-                  py: 1.5,
-                  bgcolor: b.highlight ? "#fffbeb" : "transparent",
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 38, color: PLUS_COLOR }}>
-                  {b.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography fontWeight={600} variant="body2">{b.title}</Typography>
-                      {b.highlight && (
-                        <Chip
-                          label="Instant"
-                          size="small"
-                          sx={{ bgcolor: PLUS_COLOR, color: "#fff", height: 18, fontSize: "0.6rem", "& .MuiChip-label": { px: 0.75 } }}
-                        />
-                      )}
-                    </Box>
-                  }
-                  secondary={b.desc}
-                />
-              </ListItem>
-            </Box>
-          ))}
-        </List>
-      </Paper>
+      <div className="border border-border rounded-2xl overflow-hidden mb-6">
+        <div className="px-4 py-3" style={{ backgroundColor: PLUS_COLOR }}>
+          <p className="font-bold text-white">What you get</p>
+        </div>
+        {BENEFITS.map((b, i) => (
+          <div key={i}>
+            {i > 0 && <Separator />}
+            <div className={`flex items-start gap-3 px-4 py-3 ${b.highlight ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
+              <span style={{ color: PLUS_COLOR }} className="shrink-0 mt-0.5">{b.icon}</span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={`text-sm font-semibold ${(b as any).soon ? "text-muted-foreground" : ""}`}>{b.title}</p>
+                  {b.highlight && (
+                    <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: PLUS_COLOR }}>Instant</span>
+                  )}
+                  {(b as any).soon && (
+                    <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Soon</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{b.desc}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Price + CTA */}
       {!alreadyPlus && (
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.5, mb: 0.5 }}>
-            <Typography variant="h4" fontWeight={800} sx={{ color: PLUS_COLOR }}>
-              $2.99
-            </Typography>
-            <Typography variant="body2" color="text.secondary">one-time, from your balance</Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-            No subscription. No renewals. Just pay once and it&apos;s yours.
-          </Typography>
-
+        <div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-4xl font-extrabold" style={{ color: PLUS_COLOR }}>$2.99</span>
+            <span className="text-sm text-muted-foreground">one-time, from your balance</span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">No subscription. No renewals. Just pay once and it&apos;s yours.</p>
           {!user ? (
-            <Button
-              variant="contained"
-              component={NextLink}
-              href="/login"
-              startIcon={<WorkspacePremiumIcon />}
-              sx={{ bgcolor: PLUS_COLOR, "&:hover": { bgcolor: "#d97706" }, fontWeight: 700 }}
-            >
-              Log in to buy Plus
+            <Button className="gap-2 font-bold" style={{ backgroundColor: PLUS_COLOR }} asChild>
+              <NextLink href="/login"><Crown size={16} /> Log in to buy Plus</NextLink>
             </Button>
           ) : (
-            <Button
-              variant="contained"
-              onClick={() => { setError(""); setConfirmOpen(true) }}
-              startIcon={<WorkspacePremiumIcon />}
-              sx={{ bgcolor: PLUS_COLOR, "&:hover": { bgcolor: "#d97706" }, fontWeight: 700 }}
-            >
-              Get Plus — $2.99
+            <Button className="gap-2 font-bold" style={{ backgroundColor: PLUS_COLOR }} onClick={() => { setError(""); setConfirmOpen(true) }}>
+              <Crown size={16} /> Get Plus — $2.99
             </Button>
           )}
-
-          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+          <p className="text-xs text-muted-foreground mt-2">
             Your balance: <strong>${Number(user?.balance ?? 0).toFixed(2)}</strong>
             {user && Number(user.balance) < PLUS_PRICE && (
-              <Typography component="span" variant="caption" color="error.main" fontWeight={700}> — not enough balance</Typography>
+              <span className="text-destructive font-bold"> — not enough balance</span>
             )}
-          </Typography>
-        </Box>
+          </p>
+        </div>
       )}
 
-      {/* API docs link */}
       {alreadyPlus && (
-        <Box sx={{ mt: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<ApiIcon />}
-            component={NextLink}
-            href="/plus/docs"
-            sx={{ borderColor: PLUS_COLOR, color: PLUS_COLOR, "&:hover": { borderColor: "#d97706", bgcolor: "#fffbeb" }, borderRadius: 1 }}
-          >
-            API Documentation
+        <div className="mt-4">
+          <Button variant="outline" className="gap-2" style={{ borderColor: PLUS_COLOR, color: PLUS_COLOR }} asChild>
+            <NextLink href="/plus/docs"><Code2 size={16} /> API Documentation</NextLink>
           </Button>
-        </Box>
+        </div>
       )}
 
       {/* Confirmation dialog */}
-      <Dialog open={confirmOpen} onClose={() => !buying && setConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          Buy OmegaCases Plus?
-        </DialogTitle>
-        <DialogContent>
-          <Typography gutterBottom>
-            <strong>$2.99</strong> will be taken from your balance. This can&apos;t be undone.
-          </Typography>
-          <Box sx={{ p: 1.5, bgcolor: "#fffbeb", borderRadius: 1, border: "1px solid #f59e0b44", mt: 1 }}>
-            <Typography variant="body2">Balance: <strong>${Number(user?.balance ?? 0).toFixed(2)}</strong></Typography>
-            <Typography variant="body2">Cost: <strong style={{ color: PLUS_COLOR }}>-$2.99</strong></Typography>
-            <Divider sx={{ my: 0.75 }} />
-            <Typography variant="body2" fontWeight={700}>
-              After: ${Math.max(0, Number(user?.balance ?? 0) - PLUS_PRICE).toFixed(2)}
-            </Typography>
-          </Box>
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      <Dialog open={confirmOpen} onOpenChange={(v) => !buying && setConfirmOpen(v)}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-bold">Buy OmegaCases Plus?</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <p className="text-sm"><strong>$2.99</strong> will be taken from your balance. This can&apos;t be undone.</p>
+            <div className="p-3 rounded-lg border text-sm flex flex-col gap-1" style={{ backgroundColor: "#fffbeb", borderColor: PLUS_COLOR + "44" }}>
+              <span>Balance: <strong>${Number(user?.balance ?? 0).toFixed(2)}</strong></span>
+              <span>Cost: <strong style={{ color: PLUS_COLOR }}>-$2.99</strong></span>
+              <Separator className="my-0.5" />
+              <span className="font-bold">After: ${Math.max(0, Number(user?.balance ?? 0) - PLUS_PRICE).toFixed(2)}</span>
+            </div>
+            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={buying}>Cancel</Button>
+            <Button
+              className="gap-2 font-bold"
+              style={{ backgroundColor: PLUS_COLOR }}
+              onClick={handleBuy}
+              disabled={buying || (user ? Number(user.balance) < PLUS_PRICE : true)}
+            >
+              {buying ? <Loader2 size={14} className="animate-spin" /> : <LockOpen size={14} />}
+              {buying ? "Processing..." : "Confirm — $2.99"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setConfirmOpen(false)} disabled={buying}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleBuy}
-            disabled={buying || (user ? Number(user.balance) < PLUS_PRICE : true)}
-            startIcon={buying ? <CircularProgress size={14} sx={{ color: "inherit" }} /> : <LockOpenIcon />}
-            sx={{ bgcolor: PLUS_COLOR, "&:hover": { bgcolor: "#d97706" }, fontWeight: 700 }}
-          >
-            {buying ? "Processing..." : "Confirm — $2.99"}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   )
 }

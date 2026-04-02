@@ -1,16 +1,13 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import {
-  Container, Box, Typography, Paper, Chip, Divider,
-  Alert, Button,
-} from "@mui/material"
-import LockIcon from "@mui/icons-material/Lock"
-import ApiIcon from "@mui/icons-material/Api"
-import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
+import { useRouter } from "next/navigation"
 import NextLink from "next/link"
+import { Lock, Code2, Crown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/lib/auth-context"
 
 const BASE = "https://omegacases.com"
 
@@ -112,9 +109,9 @@ const ENDPOINTS = [
 ]
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: "#2e7d32",
-  POST: "#1565c0",
-  DELETE: "#c62828",
+  GET: "#16a34a",
+  POST: "#2563eb",
+  DELETE: "#dc2626",
 }
 
 export default function PlusDocsPage() {
@@ -127,123 +124,83 @@ export default function PlusDocsPage() {
     }
   }, [user, router])
 
-  if (!user) return null
-  if (!user.plus) return null
+  if (!user || !user.plus) return null
 
   return (
-    <Container maxWidth="md" sx={{ py: 6 }}>
-      {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
-        <ApiIcon sx={{ fontSize: 36, color: "primary.main" }} />
-        <Box>
-          <Typography variant="h4" fontWeight={800}>API Documentation</Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <WorkspacePremiumIcon sx={{ fontSize: 16, color: "#f59e0b" }} />
-            <Typography variant="body2" sx={{ color: "#f59e0b", fontWeight: 700 }}>Plus Exclusive</Typography>
-          </Box>
-        </Box>
-      </Box>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+    <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-2">
+        <Code2 size={32} className="text-primary" />
+        <div>
+          <h1 className="text-3xl font-extrabold">API Documentation</h1>
+          <div className="flex items-center gap-1.5">
+            <Crown size={14} className="text-amber-500" />
+            <span className="text-sm font-bold text-amber-500">Plus Exclusive</span>
+          </div>
+        </div>
+      </div>
+      <p className="text-muted-foreground mb-8">
         Programmatic access to OmegaCases data. Your user ID must be a Plus member to use authenticated endpoints.
-      </Typography>
+      </p>
 
-      {/* Auth note */}
-      <Alert severity="info" icon={<LockIcon fontSize="small" />} sx={{ mb: 4 }}>
-        <Typography variant="body2" fontWeight={700}>Authentication</Typography>
-        <Typography variant="body2">
-          For authenticated endpoints, pass your user ID as a query parameter: <code>?user_id={user.id}</code>
-        </Typography>
-        <Box sx={{ mt: 1, p: 1, bgcolor: "#e3f2fd", borderRadius: 1, fontFamily: "monospace", fontSize: "0.8rem", wordBreak: "break-all" }}>
-          Your user ID: <strong>{user.id}</strong>
-        </Box>
+      <Alert className="mb-6">
+        <Lock size={14} />
+        <AlertDescription>
+          <p className="font-bold mb-1">Authentication</p>
+          <p className="text-sm">For authenticated endpoints, pass your user ID as a query parameter: <code className="bg-muted px-1 rounded">?user_id={user.id}</code></p>
+          <div className="mt-2 p-2 bg-muted rounded font-mono text-xs break-all">
+            Your user ID: <strong>{user.id}</strong>
+          </div>
+        </AlertDescription>
       </Alert>
 
-      {/* Base URL */}
-      <Paper elevation={0} sx={{ p: 2, mb: 4, border: "1px solid #e3f2fd", borderRadius: 2 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>Base URL</Typography>
-        <Typography variant="body2" fontFamily="monospace" fontSize="0.9rem">{BASE}</Typography>
-      </Paper>
+      <div className="p-3 border border-border rounded-lg mb-8">
+        <p className="text-xs font-semibold text-muted-foreground mb-1">Base URL</p>
+        <code className="font-mono text-sm">{BASE}</code>
+      </div>
 
-      {/* Endpoints */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div className="flex flex-col gap-4">
         {ENDPOINTS.map((ep, i) => (
-          <Paper key={i} elevation={0} sx={{ border: "1px solid #e3f2fd", borderRadius: 2, overflow: "hidden" }}>
-            {/* Endpoint header */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, bgcolor: "#f8fbff" }}>
-              <Chip
-                label={ep.method}
-                size="small"
-                sx={{
-                  bgcolor: METHOD_COLORS[ep.method],
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "0.7rem",
-                  height: 22,
-                  "& .MuiChip-label": { px: 1 },
-                }}
-              />
-              <Typography fontFamily="monospace" fontWeight={600} fontSize="0.9rem" sx={{ wordBreak: "break-all" }}>
-                {ep.path}
-              </Typography>
+          <div key={i} className="border border-border rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 bg-muted">
+              <span
+                className="text-white text-xs font-bold px-2 py-0.5 rounded"
+                style={{ backgroundColor: METHOD_COLORS[ep.method] }}
+              >
+                {ep.method}
+              </span>
+              <code className="font-mono font-semibold text-sm break-all flex-1">{ep.path}</code>
               {ep.auth && (
-                <Chip
-                  icon={<LockIcon sx={{ fontSize: "0.75rem !important" }} />}
-                  label="Auth"
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                  sx={{ height: 20, fontSize: "0.65rem", "& .MuiChip-label": { px: 0.5 } }}
-                />
+                <span className="flex items-center gap-1 text-xs text-amber-600 border border-amber-300 rounded px-1.5 py-0.5 font-semibold">
+                  <Lock size={10} /> Auth
+                </span>
               )}
-            </Box>
-
-            <Divider />
-
-            <Box sx={{ px: 3, py: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{ep.desc}</Typography>
-
-              <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" gutterBottom>
-                EXAMPLE REQUEST
-              </Typography>
-              <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2, mb: 2 }}>
-                <Typography
-                  component="pre"
-                  sx={{ m: 0, color: "#90caf9", fontFamily: "monospace", fontSize: "0.8rem", whiteSpace: "pre-wrap", wordBreak: "break-all" }}
-                >
-                  {`fetch("${BASE}${ep.path.includes("{") ? ep.path.replace("{username}", "player1").replace("{userId}", user.id) : ep.path}${ep.auth ? (ep.path.includes("?") ? `&user_id=${user.id}` : `?user_id=${user.id}`) : ""}")`}
-                </Typography>
-              </Box>
-
-              <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" gutterBottom>
-                RESPONSE
-              </Typography>
-              <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2 }}>
-                <Typography
-                  component="pre"
-                  sx={{ m: 0, color: "#a5d6a7", fontFamily: "monospace", fontSize: "0.78rem", whiteSpace: "pre-wrap" }}
-                >
-                  {ep.response}
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </div>
+            <Separator />
+            <div className="px-4 py-3 flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">{ep.desc}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Example Request</p>
+              <pre className="bg-slate-900 rounded-lg p-3 text-blue-300 font-mono text-xs whitespace-pre-wrap break-all">
+                {`fetch("${BASE}${ep.path.includes("{") ? ep.path.replace("{username}", "player1").replace("{userId}", user.id) : ep.path}${ep.auth ? (ep.path.includes("?") ? `&user_id=${user.id}` : `?user_id=${user.id}`) : ""}")`}
+              </pre>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Response</p>
+              <pre className="bg-slate-900 rounded-lg p-3 text-green-300 font-mono text-xs whitespace-pre-wrap">
+                {ep.response}
+              </pre>
+            </div>
+          </div>
         ))}
-      </Box>
+      </div>
 
-      {/* OAuth Guide */}
-      <Box sx={{ mt: 6 }}>
-        <Typography variant="h5" fontWeight={800} gutterBottom>OAuth / Sign In with OmegaCases</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+      <div className="mt-10">
+        <h2 className="text-2xl font-extrabold mb-2">OAuth / Sign In with OmegaCases</h2>
+        <p className="text-muted-foreground mb-6 text-sm">
           Add "Sign In with OmegaCases" to your app in 2 steps. Generate a consent URL, then handle the callback.
-        </Typography>
-
-        <Paper sx={{ p: 3, mb: 3, bgcolor: "#f5f5f5" }}>
-          <Typography variant="subtitle2" fontWeight={700} gutterBottom>Step 1: Generate OAuth URL</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            POST to <code>/api/oauth/init</code> (no auth required):
-          </Typography>
-          <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2, mb: 2 }}>
-            <Typography component="pre" sx={{ m: 0, color: "#90caf9", fontFamily: "monospace", fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>
+        </p>
+        <div className="bg-muted rounded-xl p-5 flex flex-col gap-4">
+          <div>
+            <p className="font-bold text-sm mb-2">Step 1: Generate OAuth URL</p>
+            <p className="text-sm text-muted-foreground mb-2">POST to <code className="bg-background px-1 rounded">/api/oauth/init</code> (no auth required):</p>
+            <pre className="bg-slate-900 rounded-lg p-3 text-blue-300 font-mono text-xs whitespace-pre-wrap">
 {`const res = await fetch("${BASE}/api/oauth/init", {
   method: "POST",
   body: JSON.stringify({
@@ -257,15 +214,12 @@ export default function PlusDocsPage() {
 })
 const { generated_url } = await res.json()
 // Use generated_url as your "Sign In" button href`}
-            </Typography>
-          </Box>
-
-          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ mt: 3 }}>Step 2: Handle Callback</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            When the user confirms, we POST to your callback URL with their data:
-          </Typography>
-          <Box sx={{ bgcolor: "#0d1b2a", borderRadius: 1.5, p: 2 }}>
-            <Typography component="pre" sx={{ m: 0, color: "#a5d6a7", fontFamily: "monospace", fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>
+            </pre>
+          </div>
+          <div>
+            <p className="font-bold text-sm mb-2">Step 2: Handle Callback</p>
+            <p className="text-sm text-muted-foreground mb-2">When the user confirms, we POST to your callback URL with their data:</p>
+            <pre className="bg-slate-900 rounded-lg p-3 text-green-300 font-mono text-xs whitespace-pre-wrap">
 {`POST /api/oauth/callback
 {
   "success": true,
@@ -275,17 +229,19 @@ const { generated_url } = await res.json()
     "balance": 45.67
   }
 }`}
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
+            </pre>
+          </div>
+        </div>
+      </div>
 
-      <Box sx={{ mt: 5, textAlign: "center" }}>
-        <Button component={NextLink} href="/plus" variant="outlined" startIcon={<WorkspacePremiumIcon sx={{ color: "#f59e0b" }} />}
-          sx={{ borderColor: "#f59e0b", color: "#f59e0b" }}>
-          Back to Plus
+      <div className="mt-10 text-center">
+        <Button variant="outline" className="gap-2 border-amber-400 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30" asChild>
+          <NextLink href="/plus">
+            <Crown size={14} className="text-amber-500" />
+            Back to Plus
+          </NextLink>
         </Button>
-      </Box>
-    </Container>
+      </div>
+    </div>
   )
 }

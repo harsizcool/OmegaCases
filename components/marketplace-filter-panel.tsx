@@ -1,9 +1,11 @@
 "use client"
 
-import {
-  Box, Card, Typography, TextField, Chip, FormControl, InputLabel,
-  Select, MenuItem, Button, Checkbox, FormControlLabel,
-} from "@mui/material"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 
@@ -36,68 +38,111 @@ export default function FilterPanel({
     setRarities(rarities.includes(r) ? rarities.filter((x) => x !== r) : [...rarities, r])
 
   return (
-    <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
-      <Card sx={{ p: 2, position: { md: "sticky" }, top: { md: 80 } }}>
-        <Typography variant="subtitle1" fontWeight={700} gutterBottom>Filters</Typography>
-
-        <TextField label="Search item name" value={search} onChange={(e) => setSearch(e.target.value)}
-          fullWidth size="small" sx={{ mb: 2 }} autoComplete="off" />
-
-        <TextField label="Seller username" value={sellerSearch} onChange={(e) => setSellerSearch(e.target.value)}
-          fullWidth size="small" sx={{ mb: 2 }} autoComplete="off" />
-
-        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
-          Rarity
-        </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
-          {RARITIES.map((r) => (
-            <Chip
-              key={r}
-              label={r}
-              size="small"
-              onClick={() => toggleRarity(r)}
-              sx={{
-                bgcolor: rarities.includes(r) ? RARITY_COLORS[r as Rarity] : "transparent",
-                color: rarities.includes(r) ? "#fff" : "text.secondary",
-                border: `1px solid ${RARITY_COLORS[r as Rarity]}`,
-                cursor: "pointer",
-                fontWeight: rarities.includes(r) ? 700 : 400,
-              }}
+    <div className="w-full md:w-60 shrink-0">
+      <Card className="md:sticky md:top-20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Filters</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold">Item name</Label>
+            <Input
+              placeholder="Search item name"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoComplete="off"
             />
-          ))}
-        </Box>
+          </div>
 
-        <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-          <TextField
-            label="Min $" value={minPrice} onChange={(e) => setMinPrice(e.target.value)}
-            size="small" type="number" inputProps={{ min: 0, step: 0.01 }} sx={{ flex: 1 }}
-          />
-          <TextField
-            label="Max $" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)}
-            size="small" type="number" inputProps={{ min: 0, step: 0.01 }} sx={{ flex: 1 }}
-          />
-        </Box>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold">Seller</Label>
+            <Input
+              placeholder="Seller username"
+              value={sellerSearch}
+              onChange={(e) => setSellerSearch(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
 
-        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Sort by</InputLabel>
-          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} label="Sort by">
-            <MenuItem value="created_at">Newest</MenuItem>
-            <MenuItem value="price">Price</MenuItem>
-          </Select>
-        </FormControl>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rarity</Label>
+            <div className="flex flex-wrap gap-1">
+              {RARITIES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => toggleRarity(r)}
+                  className="text-xs px-2 py-0.5 rounded-full border font-medium transition-all"
+                  style={{
+                    backgroundColor: rarities.includes(r) ? RARITY_COLORS[r as Rarity] : "transparent",
+                    borderColor: RARITY_COLORS[r as Rarity],
+                    color: rarities.includes(r) ? "#fff" : RARITY_COLORS[r as Rarity],
+                    fontWeight: rarities.includes(r) ? 700 : 400,
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <FormControlLabel
-          control={<Checkbox checked={ignoreOwn} onChange={(e) => setIgnoreOwn(e.target.checked)} size="small" />}
-          label={<Typography variant="body2">Ignore Your Listings</Typography>}
-          sx={{ mb: 0.5, display: "block" }}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={showSold} onChange={(e) => setShowSold(e.target.checked)} size="small" />}
-          label={<Typography variant="body2">Show Sold Items</Typography>}
-          sx={{ mb: 1.5, display: "block" }}
-        />
-        <Button variant="outlined" fullWidth onClick={onApply}>Apply</Button>
+          <div className="flex gap-2">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <Label className="text-xs font-semibold">Min $</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                min={0}
+                step={0.01}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <Label className="text-xs font-semibold">Max $</Label>
+              <Input
+                type="number"
+                placeholder="∞"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                min={0}
+                step={0.01}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold">Sort by</Label>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Newest</SelectItem>
+                <SelectItem value="price">Price</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={ignoreOwn}
+                onCheckedChange={(v) => setIgnoreOwn(Boolean(v))}
+              />
+              <span className="text-sm">Ignore Your Listings</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={showSold}
+                onCheckedChange={(v) => setShowSold(Boolean(v))}
+              />
+              <span className="text-sm">Show Sold Items</span>
+            </label>
+          </div>
+
+          <Button variant="outline" className="w-full" onClick={onApply}>Apply</Button>
+        </CardContent>
       </Card>
-    </Box>
+    </div>
   )
 }

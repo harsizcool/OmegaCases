@@ -2,18 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react"
 import NextLink from "next/link"
-import {
-  Container, Box, Typography, Card, CardContent, Chip, Button,
-  Avatar, Grid, Tabs, Tab, Alert, CircularProgress, Divider,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  IconButton, Tooltip, Badge, InputAdornment, Autocomplete,
-} from "@mui/material"
-import AddIcon from "@mui/icons-material/Add"
-import CloseIcon from "@mui/icons-material/Close"
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
-import CheckIcon from "@mui/icons-material/Check"
-import BlockIcon from "@mui/icons-material/Block"
-import SearchIcon from "@mui/icons-material/Search"
+import { Plus, X, ArrowLeftRight, Check, Ban, Search, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
 import type { InventoryItem, Rarity } from "@/lib/types"
@@ -39,7 +36,6 @@ function ItemSlots({
   const [search, setSearch] = useState("")
   const [rarityFilter, setRarityFilter] = useState<string>("")
 
-  // Deduplicate inventory by row ID to prevent duplicate key warnings
   const uniqueInventory = inventory.filter((inv, idx, arr) => arr.findIndex((x) => x.id === inv.id) === idx)
   const available = uniqueInventory.filter((inv) => !items.find((i) => i.id === inv.id))
   const filtered = available.filter((inv) => {
@@ -49,144 +45,110 @@ function ItemSlots({
   })
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
-        <Typography variant="caption" color="primary.main" fontWeight={600}>
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <p className="text-xs font-bold">{label}</p>
+        <p className="text-xs text-primary font-semibold">
           RAP: ${items.reduce((s, ti) => s + ti.item.rap, 0).toFixed(2)}
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
       {/* Selected slots */}
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1, minHeight: 56 }}>
+      <div className="flex flex-wrap gap-1.5 mb-2 min-h-[56px]">
         {items.map((ti, idx) => (
-          <Badge
-            key={`${ti.id}-${idx}`}
-            badgeContent={
-              <IconButton
-                size="small"
-                onClick={() => onRemove(ti.id)}
-                sx={{ bgcolor: "error.main", color: "#fff", width: 16, height: 16, p: 0 }}
-              >
-                <CloseIcon sx={{ fontSize: 10 }} />
-              </IconButton>
-            }
-            overlap="circular"
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <Tooltip title={`${ti.item.name} — RAP: $${ti.item.rap.toFixed(2)}`}>
-              <Box
-                component="img"
-                src={ti.item.image_url}
-                alt={ti.item.name}
-                sx={{
-                  width: 52, height: 52, objectFit: "contain", borderRadius: 1,
-                  border: `2px solid ${RARITY_COLORS[ti.item.rarity as Rarity]}66`,
-                  bgcolor: "#f8fbff", cursor: "pointer",
-                }}
-              />
+          <TooltipProvider key={`${ti.id}-${idx}`}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative">
+                  <img
+                    src={ti.item.image_url}
+                    alt={ti.item.name}
+                    className="w-14 h-14 object-contain rounded-lg cursor-pointer"
+                    style={{ border: `2px solid ${RARITY_COLORS[ti.item.rarity as Rarity]}66`, backgroundColor: "#f8fbff" }}
+                  />
+                  <button
+                    onClick={() => onRemove(ti.id)}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center"
+                  >
+                    <X size={9} className="text-white" />
+                  </button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{ti.item.name} — RAP: ${ti.item.rap.toFixed(2)}</TooltipContent>
             </Tooltip>
-          </Badge>
+          </TooltipProvider>
         ))}
         {items.length < MAX_ITEMS && (
-          <Box
-            sx={{
-              width: 52, height: 52, border: "2px dashed #1976d244", borderRadius: 1,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#1976d266",
-            }}
-          >
-            <AddIcon fontSize="small" />
-          </Box>
+          <div className="w-14 h-14 border-2 border-dashed border-primary/20 rounded-lg flex items-center justify-center text-primary/30">
+            <Plus size={16} />
+          </div>
         )}
-      </Box>
+      </div>
 
-      {/* Search + rarity filter + available items */}
+      {/* Search + filter + available */}
       {items.length < MAX_ITEMS && available.length > 0 && (
         <>
-          <TextField
-            size="small"
-            placeholder="Search items..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            fullWidth
-            sx={{ mb: 0.75 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-          {/* Rarity filter chips */}
-          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1 }}>
-            <Chip
-              label="All"
-              size="small"
-              onClick={() => setRarityFilter("")}
-              variant={rarityFilter === "" ? "filled" : "outlined"}
-              sx={{ fontSize: "0.65rem", height: 20, cursor: "pointer" }}
+          <div className="relative mb-1.5">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-6 h-7 text-xs"
             />
+          </div>
+          <div className="flex gap-1 flex-wrap mb-1.5">
+            <button
+              onClick={() => setRarityFilter("")}
+              className={`text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full border transition-colors ${rarityFilter === "" ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground"}`}
+            >All</button>
             {RARITIES_LIST.map((r) => (
-              <Chip
+              <button
                 key={r}
-                label={r}
-                size="small"
                 onClick={() => setRarityFilter(rarityFilter === r ? "" : r)}
-                variant={rarityFilter === r ? "filled" : "outlined"}
-                sx={{
-                  fontSize: "0.65rem", height: 20, cursor: "pointer",
-                  bgcolor: rarityFilter === r ? RARITY_COLORS[r as Rarity] : undefined,
+                className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full border transition-colors"
+                style={{
+                  backgroundColor: rarityFilter === r ? RARITY_COLORS[r as Rarity] : "transparent",
                   color: rarityFilter === r ? "#fff" : RARITY_COLORS[r as Rarity],
                   borderColor: RARITY_COLORS[r as Rarity],
                 }}
-              />
+              >{r}</button>
             ))}
-          </Box>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxHeight: 130, overflowY: "auto" }}>
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
             {filtered.map((inv) => (
-              <Tooltip
-                key={inv.id}
-                title={`${inv.items?.name} — RAP: $${Number(inv.items?.rap || 0).toFixed(2)}`}
-              >
-                <Box
-                  component="img"
-                  src={inv.items?.image_url}
-                  alt={inv.items?.name}
-                  onClick={() => onAdd(inv)}
-                  sx={{
-                    width: 42, height: 42, objectFit: "contain", borderRadius: 1,
-                    border: `2px solid ${RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"]}44`,
-                    bgcolor: "#f8fbff", cursor: "pointer",
-                    "&:hover": { opacity: 0.8, transform: "scale(1.06)" },
-                    transition: "all 0.1s",
-                  }}
-                />
-              </Tooltip>
+              <TooltipProvider key={inv.id}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <img
+                      src={inv.items?.image_url}
+                      alt={inv.items?.name}
+                      onClick={() => onAdd(inv)}
+                      className="w-11 h-11 object-contain rounded-lg cursor-pointer hover:opacity-80 hover:scale-105 transition-all"
+                      style={{
+                        border: `2px solid ${RARITY_COLORS[(inv.items?.rarity as Rarity) || "Common"]}44`,
+                        backgroundColor: "#f8fbff",
+                      }}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{inv.items?.name} — RAP: ${Number(inv.items?.rap || 0).toFixed(2)}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ))}
-            {filtered.length === 0 && (
-              <Typography variant="caption" color="text.secondary">No items match.</Typography>
-            )}
-          </Box>
+            {filtered.length === 0 && <p className="text-xs text-muted-foreground">No items match.</p>}
+          </div>
         </>
       )}
       {items.length === MAX_ITEMS && (
-        <Typography variant="caption" color="text.secondary">Max {MAX_ITEMS} items reached</Typography>
+        <p className="text-xs text-muted-foreground">Max {MAX_ITEMS} items reached</p>
       )}
-    </Box>
+    </div>
   )
 }
 
 interface TradeItem {
   id: string
-  item: {
-    id: string
-    name: string
-    image_url: string
-    rarity: string
-    rap: number
-  }
+  item: { id: string; name: string; image_url: string; rarity: string; rap: number }
 }
 
 interface Trade {
@@ -197,8 +159,8 @@ interface Trade {
   receiver_balance: number
   status: string
   created_at: string
-  sender?: { id: string; username: string; profile_picture?: string }
-  receiver?: { id: string; username: string; profile_picture?: string }
+  sender?: { id: string; username: string; profile_picture?: string; plus?: boolean }
+  receiver?: { id: string; username: string; profile_picture?: string; plus?: boolean }
   trade_items: Array<{
     id: string
     side: string
@@ -214,13 +176,15 @@ function tradeValue(items: TradeItem[], balance: number) {
   return items.reduce((sum, ti) => sum + Number(ti.item.rap), 0) + Number(balance)
 }
 
-function tradeValueFromSide(
-  tradeItems: Trade["trade_items"],
-  side: string,
-  balance: number
-) {
-  const items = tradeItems.filter((ti) => ti.side === side)
-  return items.reduce((sum, ti) => sum + Number(ti.inventory.items.rap), 0) + Number(balance)
+function tradeValueFromSide(tradeItems: Trade["trade_items"], side: string, balance: number) {
+  return tradeItems.filter((ti) => ti.side === side).reduce((sum, ti) => sum + Number(ti.inventory.items.rap), 0) + Number(balance)
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  accepted: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  declined: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  cancelled: "bg-muted text-muted-foreground",
 }
 
 export default function TradePage() {
@@ -234,6 +198,7 @@ export default function TradePage() {
 
   const [newTradeOpen, setNewTradeOpen] = useState(false)
   const [allUsers, setAllUsers] = useState<{ id: string; username: string }[]>([])
+  const [userSearch, setUserSearch] = useState("")
   const [receiver, setReceiver] = useState<{ id: string; username: string } | null>(null)
   const [myInventory, setMyInventory] = useState<InventoryItem[]>([])
   const [theirInventory, setTheirInventory] = useState<InventoryItem[]>([])
@@ -257,7 +222,6 @@ export default function TradePage() {
 
   const fetchMyInventory = async () => {
     if (!user) return
-    // Paginate through all pages since API now returns { items, total, pageSize }
     let all: InventoryItem[] = []
     let page = 0
     while (true) {
@@ -299,44 +263,34 @@ export default function TradePage() {
     setRequestBalance("")
     setReceiver(null)
     setTheirInventory([])
+    setUserSearch("")
     await fetchMyInventory()
     await fetchUsers()
     setNewTradeOpen(true)
   }
 
-  const handleReceiverChange = async (val: { id: string; username: string } | null) => {
+  const handleReceiverSelect = async (val: { id: string; username: string }) => {
     setReceiver(val)
+    setUserSearch(val.username)
     setRequestItems([])
-    if (val) await fetchTheirInventory(val.id)
-    else setTheirInventory([])
+    await fetchTheirInventory(val.id)
   }
 
   const addOfferItem = (inv: InventoryItem) => {
-    if (offerItems.length >= MAX_ITEMS) return
-    if (offerItems.find((i) => i.id === inv.id)) return
-    setOfferItems((prev) => [
-      ...prev,
-      { id: inv.id, item: { id: inv.item_id, name: inv.items!.name, image_url: inv.items!.image_url, rarity: inv.items!.rarity, rap: Number(inv.items!.rap) } },
-    ])
+    if (offerItems.length >= MAX_ITEMS || offerItems.find((i) => i.id === inv.id)) return
+    setOfferItems((prev) => [...prev, { id: inv.id, item: { id: inv.item_id, name: inv.items!.name, image_url: inv.items!.image_url, rarity: inv.items!.rarity, rap: Number(inv.items!.rap) } }])
   }
 
   const addRequestItem = (inv: InventoryItem) => {
-    if (requestItems.length >= MAX_ITEMS) return
-    if (requestItems.find((i) => i.id === inv.id)) return
-    setRequestItems((prev) => [
-      ...prev,
-      { id: inv.id, item: { id: inv.item_id, name: inv.items!.name, image_url: inv.items!.image_url, rarity: inv.items!.rarity, rap: Number(inv.items!.rap) } },
-    ])
+    if (requestItems.length >= MAX_ITEMS || requestItems.find((i) => i.id === inv.id)) return
+    setRequestItems((prev) => [...prev, { id: inv.id, item: { id: inv.item_id, name: inv.items!.name, image_url: inv.items!.image_url, rarity: inv.items!.rarity, rap: Number(inv.items!.rap) } }])
   }
 
   const handleCreateTrade = async () => {
     if (!user || !receiver) return
     const ob = Number(offerBalance) || 0
     const rb = Number(requestBalance) || 0
-    if (ob > MAX_BALANCE || rb > MAX_BALANCE) {
-      setCreateError(`Max $${MAX_BALANCE} balance per side`)
-      return
-    }
+    if (ob > MAX_BALANCE || rb > MAX_BALANCE) { setCreateError(`Max $${MAX_BALANCE} balance per side`); return }
     setCreateLoading(true)
     setCreateError("")
     try {
@@ -386,356 +340,305 @@ export default function TradePage() {
     }
   }
 
-
   const TradeCard = ({ trade, isSent }: { trade: Trade; isSent: boolean }) => {
     const other = isSent ? trade.receiver : trade.sender
-
-    // For sent trades: left = "You Offer" (sender), right = "You Request" (receiver)
-    // For received trades: left = "They Offer" (sender = them), right = "They Request" (receiver = you)
-    // So from receiver's perspective: left side shows what THEY (sender) put in, right shows what YOU (receiver) must give
-    const leftSide = "sender"
-    const rightSide = "receiver"
-
-    const leftItems = trade.trade_items.filter((ti) => ti.side === leftSide)
-    const rightItems = trade.trade_items.filter((ti) => ti.side === rightSide)
-    const leftBalance = trade.sender_balance
-    const rightBalance = trade.receiver_balance
-
+    const leftItems = trade.trade_items.filter((ti) => ti.side === "sender")
+    const rightItems = trade.trade_items.filter((ti) => ti.side === "receiver")
+    const leftValue = tradeValueFromSide(trade.trade_items, "sender", trade.sender_balance)
+    const rightValue = tradeValueFromSide(trade.trade_items, "receiver", trade.receiver_balance)
+    const isPending = trade.status === "pending"
     const leftLabel = isSent ? "You Offer" : "They Offer"
     const rightLabel = isSent ? "You Request" : "They Request"
 
-    const leftValue = tradeValueFromSide(trade.trade_items, leftSide, leftBalance)
-    const rightValue = tradeValueFromSide(trade.trade_items, rightSide, rightBalance)
-    const isPending = trade.status === "pending"
-
-    const statusColor: Record<string, "default" | "warning" | "success" | "error"> = {
-      pending: "warning",
-      accepted: "success",
-      declined: "error",
-      cancelled: "default",
-    }
-
     return (
-      <Card sx={{ mb: 2, border: isPending ? "1px solid #1976d233" : "1px solid #e0e0e0" }}>
-        <CardContent>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Avatar
-                src={other?.profile_picture || undefined}
-                sx={{ width: 30, height: 30, bgcolor: "primary.main", fontSize: 13 }}
-              >
+      <div className={`border rounded-xl p-4 mb-3 ${isPending ? "border-primary/30" : "border-border"}`}>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <Avatar className="w-8 h-8">
+              {other?.profile_picture && <AvatarImage src={other.profile_picture} />}
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
                 {other?.username?.[0]?.toUpperCase()}
-              </Avatar>
-              <Box>
-                <Typography variant="body2" fontWeight={600}>
-                  {isSent ? "To" : "From"}{" "}
-                  <Box
-                    component={NextLink}
-                    href={`/user/${other?.username}`}
-                    sx={{ color: "primary.main", textDecoration: "none" }}
-                  >
-                    {other?.username}
-                  </Box>
-                  {other?.plus && <PlusBadge sx={{ ml: 0.5, verticalAlign: "middle" }} />}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(trade.created_at).toLocaleDateString()}
-                </Typography>
-              </Box>
-            </Box>
-            <Chip label={trade.status} size="small" color={statusColor[trade.status] || "default"} />
-          </Box>
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-semibold">
+                {isSent ? "To" : "From"}{" "}
+                <NextLink href={`/user/${other?.username}`} className="text-primary hover:underline">{other?.username}</NextLink>
+                {other?.plus && <PlusBadge className="ml-1 align-middle" />}
+              </p>
+              <p className="text-xs text-muted-foreground">{new Date(trade.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[trade.status] || "bg-muted text-muted-foreground"}`}>
+            {trade.status}
+          </span>
+        </div>
 
-          <Grid container spacing={2}>
-            {/* Left side */}
-            <Grid item xs={5}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                  {leftLabel}
-                </Typography>
-                <Typography variant="caption" color="primary.main" fontWeight={600}>
-                  ${leftValue.toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {leftItems.map((ti, idx) => (
-                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
-                    <Box
-                      component="img"
-                      src={ti.inventory.items.image_url}
-                      alt={ti.inventory.items.name}
-                      sx={{
-                        width: 44, height: 44, objectFit: "contain", borderRadius: 1,
-                        border: `2px solid ${RARITY_COLORS[ti.inventory.items.rarity as Rarity]}44`,
-                        bgcolor: "#f8fbff",
-                      }}
-                    />
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-start">
+          <div>
+            <div className="flex justify-between mb-1">
+              <p className="text-xs text-muted-foreground font-semibold">{leftLabel}</p>
+              <p className="text-xs text-primary font-semibold">${leftValue.toFixed(2)}</p>
+            </div>
+            <div className="flex flex-wrap gap-1 min-h-[44px]">
+              {leftItems.map((ti, idx) => (
+                <TooltipProvider key={`${ti.id}-${idx}`}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <img src={ti.inventory.items.image_url} alt={ti.inventory.items.name}
+                        className="w-11 h-11 object-contain rounded-lg"
+                        style={{ border: `2px solid ${RARITY_COLORS[ti.inventory.items.rarity as Rarity]}44`, backgroundColor: "#f8fbff" }}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{ti.inventory.items.name} (RAP: ${Number(ti.inventory.items.rap).toFixed(2)})</TooltipContent>
                   </Tooltip>
-                ))}
-                {leftItems.length === 0 && (
-                  <Typography variant="caption" color="text.secondary">No items</Typography>
-                )}
-              </Box>
-              {Number(leftBalance) > 0 && (
-                <Chip label={`+$${Number(leftBalance).toFixed(2)}`} color="success" size="small" sx={{ mt: 0.5 }} />
-              )}
-            </Grid>
+                </TooltipProvider>
+              ))}
+              {leftItems.length === 0 && <p className="text-xs text-muted-foreground">No items</p>}
+            </div>
+            {Number(trade.sender_balance) > 0 && (
+              <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/20 rounded px-1.5 py-0.5 mt-1 inline-block">
+                +${Number(trade.sender_balance).toFixed(2)}
+              </span>
+            )}
+          </div>
 
-            <Grid item xs={2} sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <SwapHorizIcon sx={{ color: "text.secondary" }} />
-            </Grid>
+          <div className="flex items-center justify-center pt-6">
+            <ArrowLeftRight size={18} className="text-muted-foreground" />
+          </div>
 
-            {/* Right side */}
-            <Grid item xs={5}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                  {rightLabel}
-                </Typography>
-                <Typography variant="caption" color="primary.main" fontWeight={600}>
-                  ${rightValue.toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minHeight: 48 }}>
-                {rightItems.map((ti, idx) => (
-                  <Tooltip key={`${ti.id}-${idx}`} title={`${ti.inventory.items.name} (RAP: $${Number(ti.inventory.items.rap).toFixed(2)})`}>
-                    <Box
-                      component="img"
-                      src={ti.inventory.items.image_url}
-                      alt={ti.inventory.items.name}
-                      sx={{
-                        width: 44, height: 44, objectFit: "contain", borderRadius: 1,
-                        border: `2px solid ${RARITY_COLORS[ti.inventory.items.rarity as Rarity]}44`,
-                        bgcolor: "#f8fbff",
-                      }}
-                    />
+          <div>
+            <div className="flex justify-between mb-1">
+              <p className="text-xs text-muted-foreground font-semibold">{rightLabel}</p>
+              <p className="text-xs text-primary font-semibold">${rightValue.toFixed(2)}</p>
+            </div>
+            <div className="flex flex-wrap gap-1 min-h-[44px]">
+              {rightItems.map((ti, idx) => (
+                <TooltipProvider key={`${ti.id}-${idx}`}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <img src={ti.inventory.items.image_url} alt={ti.inventory.items.name}
+                        className="w-11 h-11 object-contain rounded-lg"
+                        style={{ border: `2px solid ${RARITY_COLORS[ti.inventory.items.rarity as Rarity]}44`, backgroundColor: "#f8fbff" }}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{ti.inventory.items.name} (RAP: ${Number(ti.inventory.items.rap).toFixed(2)})</TooltipContent>
                   </Tooltip>
-                ))}
-                {rightItems.length === 0 && (
-                  <Typography variant="caption" color="text.secondary">No items</Typography>
-                )}
-              </Box>
-              {Number(rightBalance) > 0 && (
-                <Chip label={`+$${Number(rightBalance).toFixed(2)}`} color="success" size="small" sx={{ mt: 0.5 }} />
-              )}
-            </Grid>
-          </Grid>
+                </TooltipProvider>
+              ))}
+              {rightItems.length === 0 && <p className="text-xs text-muted-foreground">No items</p>}
+            </div>
+            {Number(trade.receiver_balance) > 0 && (
+              <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/20 rounded px-1.5 py-0.5 mt-1 inline-block">
+                +${Number(trade.receiver_balance).toFixed(2)}
+              </span>
+            )}
+          </div>
+        </div>
 
-          {/* Overall trade value comparison */}
-          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mt: 1.5 }}>
-            <Typography variant="caption" color="text.secondary">
-              Trade value:{" "}
-              <Box component="span" sx={{ color: "primary.main", fontWeight: 700 }}>
-                ${leftValue.toFixed(2)}
-              </Box>
-              {" "}vs{" "}
-              <Box component="span" sx={{ color: "primary.main", fontWeight: 700 }}>
-                ${rightValue.toFixed(2)}
-              </Box>
-            </Typography>
-          </Box>
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          Trade value: <span className="text-primary font-bold">${leftValue.toFixed(2)}</span>{" "}vs{" "}
+          <span className="text-primary font-bold">${rightValue.toFixed(2)}</span>
+        </p>
 
-          {isPending && (
-            <Box sx={{ display: "flex", gap: 1, mt: 2, justifyContent: "flex-end" }}>
-              {isSent ? (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => handleAction(trade.id, "cancel")}
-                  disabled={actionLoading === trade.id + "cancel"}
-                >
-                  Cancel
+        {isPending && (
+          <div className="flex gap-2 justify-end mt-3">
+            {isSent ? (
+              <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-white"
+                onClick={() => handleAction(trade.id, "cancel")}
+                disabled={actionLoading === trade.id + "cancel"}>
+                Cancel
+              </Button>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" className="gap-1 text-destructive border-destructive hover:bg-destructive hover:text-white"
+                  onClick={() => handleAction(trade.id, "decline")} disabled={!!actionLoading}>
+                  <Ban size={13} /> Decline
                 </Button>
-              ) : (
-                <>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    startIcon={<BlockIcon />}
-                    onClick={() => handleAction(trade.id, "decline")}
-                    disabled={!!actionLoading}
-                  >
-                    Decline
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="success"
-                    startIcon={<CheckIcon />}
-                    onClick={() => handleAction(trade.id, "accept")}
-                    disabled={!!actionLoading}
-                  >
-                    Accept
-                  </Button>
-                </>
-              )}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+                <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700"
+                  onClick={() => handleAction(trade.id, "accept")} disabled={!!actionLoading}>
+                  <Check size={13} /> Accept
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     )
   }
 
   if (!user) {
     return (
-      <Container maxWidth="md" sx={{ py: 6, textAlign: "center" }}>
-        <Typography variant="h6" gutterBottom>Sign in to trade</Typography>
-        <Button variant="contained" component={NextLink} href="/login">Login</Button>
-      </Container>
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <p className="text-lg font-semibold mb-3">Sign in to trade</p>
+        <Button asChild><NextLink href="/login">Login</NextLink></Button>
+      </div>
     )
   }
 
   const pendingReceived = trades.received.filter((t) => t.status === "pending").length
   const offerVal = tradeValue(offerItems, Number(offerBalance) || 0)
   const requestVal = tradeValue(requestItems, Number(requestBalance) || 0)
+  const filteredUsers = allUsers.filter((u) => u.username.toLowerCase().includes(userSearch.toLowerCase()))
 
   return (
-    <Container maxWidth="md" sx={{ py: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" fontWeight={700}>Trades</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openNewTrade}>
-          New Trade
-        </Button>
-      </Box>
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex justify-between items-center mb-5">
+        <h1 className="text-2xl font-bold">Trades</h1>
+        <Button className="gap-2" onClick={openNewTrade}><Plus size={15} /> New Trade</Button>
+      </div>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
+      {error && <Alert variant="destructive" className="mb-3"><AlertDescription>{error}</AlertDescription></Alert>}
+      {success && <Alert className="mb-3"><AlertDescription className="text-green-600">{success}</AlertDescription></Alert>}
 
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-          <Tab
-            label={
-              <Badge badgeContent={pendingReceived} color="error">
-                <Box sx={{ pr: pendingReceived > 0 ? 1.5 : 0 }}>Received</Box>
-              </Badge>
-            }
-          />
-          <Tab label="Sent" />
-        </Tabs>
-      </Box>
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-5">
+        {[
+          { label: "Received", count: pendingReceived },
+          { label: "Sent", count: 0 },
+        ].map((t, i) => (
+          <button
+            key={t.label}
+            onClick={() => setTab(i)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${tab === i ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className="text-[0.6rem] font-bold bg-destructive text-white rounded-full px-1.5 py-0.5">{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
-        <Box textAlign="center" py={6}><CircularProgress /></Box>
+        <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-muted-foreground" /></div>
       ) : (
         <>
           {tab === 0 && (
-            trades.received.length === 0 ? (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No received trades yet.</Typography>
-              </Box>
-            ) : (
-              trades.received.map((t) => <TradeCard key={t.id} trade={t} isSent={false} />)
-            )
+            trades.received.length === 0
+              ? <p className="text-muted-foreground text-center py-10">No received trades yet.</p>
+              : trades.received.map((t) => <TradeCard key={t.id} trade={t} isSent={false} />)
           )}
           {tab === 1 && (
-            trades.sent.length === 0 ? (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No sent trades yet.</Typography>
-              </Box>
-            ) : (
-              trades.sent.map((t) => <TradeCard key={t.id} trade={t} isSent={true} />)
-            )
+            trades.sent.length === 0
+              ? <p className="text-muted-foreground text-center py-10">No sent trades yet.</p>
+              : trades.sent.map((t) => <TradeCard key={t.id} trade={t} isSent={true} />)
           )}
         </>
       )}
 
       {/* New Trade Dialog */}
-      <Dialog open={newTradeOpen} onClose={() => setNewTradeOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          New Trade
-          <IconButton onClick={() => setNewTradeOpen(false)} size="small"><CloseIcon /></IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Autocomplete
-              options={allUsers}
-              getOptionLabel={(o) => o.username}
-              value={receiver}
-              onChange={(_, v) => handleReceiverChange(v)}
-              renderInput={(params) => <TextField {...params} label="Trade with (username)" size="small" />}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              sx={{ mb: 2 }}
-            />
-          </Box>
+      <Dialog open={newTradeOpen} onOpenChange={(v) => !v && setNewTradeOpen(false)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Trade</DialogTitle>
+          </DialogHeader>
 
-          {createError && <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert>}
+          <div className="flex flex-col gap-4">
+            {/* User search */}
+            <div className="flex flex-col gap-1.5">
+              <Label>Trade with (username)</Label>
+              <div className="relative">
+                <Input
+                  placeholder="Search users..."
+                  value={userSearch}
+                  onChange={(e) => { setUserSearch(e.target.value); setReceiver(null) }}
+                />
+                {userSearch && !receiver && filteredUsers.length > 0 && (
+                  <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-popover border border-border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                    {filteredUsers.slice(0, 10).map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => handleReceiverSelect(u)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      >
+                        {u.username}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {receiver && <p className="text-xs text-green-600 font-semibold">Trading with: {receiver.username}</p>}
+            </div>
 
-          {/* Trade value summary */}
-          <Box
-            sx={{
-              display: "flex", justifyContent: "center", gap: 3, mb: 2,
-              p: 1.5, bgcolor: "#f0f7ff", borderRadius: 2,
-            }}
-          >
-            <Box textAlign="center">
-              <Typography variant="caption" color="text.secondary">You Offer</Typography>
-              <Typography variant="body2" fontWeight={700} color="primary.main">${offerVal.toFixed(2)}</Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box textAlign="center">
-              <Typography variant="caption" color="text.secondary">You Request</Typography>
-              <Typography variant="body2" fontWeight={700} color="primary.main">${requestVal.toFixed(2)}</Typography>
-            </Box>
-          </Box>
+            {createError && <Alert variant="destructive"><AlertDescription>{createError}</AlertDescription></Alert>}
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <ItemSlots
-                items={offerItems}
-                inventory={myInventory}
-                onAdd={addOfferItem}
-                onRemove={(id) => setOfferItems((p) => p.filter((i) => i.id !== id))}
-                label="You Offer"
-              />
-              <TextField
-                label="Your Balance Offer (max $50)"
-                type="number"
-                value={offerBalance}
-                onChange={(e) => setOfferBalance(e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ mt: 2 }}
-                inputProps={{ min: 0, max: MAX_BALANCE, step: 0.01 }}
-                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={`Your balance: $${Number(user.balance).toFixed(2)}`}
-              />
-            </Grid>
+            {/* Trade value summary */}
+            <div className="flex justify-center gap-6 bg-muted/50 rounded-xl p-3">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">You Offer</p>
+                <p className="text-sm font-bold text-primary">${offerVal.toFixed(2)}</p>
+              </div>
+              <Separator orientation="vertical" />
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">You Request</p>
+                <p className="text-sm font-bold text-primary">${requestVal.toFixed(2)}</p>
+              </div>
+            </div>
 
-            <Grid item xs={12} sm={6}>
-              <ItemSlots
-                items={requestItems}
-                inventory={theirInventory}
-                onAdd={addRequestItem}
-                onRemove={(id) => setRequestItems((p) => p.filter((i) => i.id !== id))}
-                label={receiver ? `Request from ${receiver.username}` : "Select a user first"}
-              />
-              <TextField
-                label="Request Balance (max $50)"
-                type="number"
-                value={requestBalance}
-                onChange={(e) => setRequestBalance(e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ mt: 2 }}
-                inputProps={{ min: 0, max: MAX_BALANCE, step: 0.01 }}
-                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-              />
-            </Grid>
-          </Grid>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-3">
+                <ItemSlots
+                  items={offerItems}
+                  inventory={myInventory}
+                  onAdd={addOfferItem}
+                  onRemove={(id) => setOfferItems((p) => p.filter((i) => i.id !== id))}
+                  label="You Offer"
+                />
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Your Balance Offer (max $50)</Label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <Input
+                      type="number"
+                      value={offerBalance}
+                      onChange={(e) => setOfferBalance(e.target.value)}
+                      min={0} max={MAX_BALANCE} step={0.01}
+                      className="pl-5 h-8 text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Your balance: ${Number(user.balance).toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <ItemSlots
+                  items={requestItems}
+                  inventory={theirInventory}
+                  onAdd={addRequestItem}
+                  onRemove={(id) => setRequestItems((p) => p.filter((i) => i.id !== id))}
+                  label={receiver ? `Request from ${receiver.username}` : "Select a user first"}
+                />
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Request Balance (max $50)</Label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <Input
+                      type="number"
+                      value={requestBalance}
+                      onChange={(e) => setRequestBalance(e.target.value)}
+                      min={0} max={MAX_BALANCE} step={0.01}
+                      className="pl-5 h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTradeOpen(false)}>Cancel</Button>
+            <Button
+              className="gap-2"
+              onClick={handleCreateTrade}
+              disabled={createLoading || !receiver || (offerItems.length === 0 && requestItems.length === 0 && !offerBalance && !requestBalance)}
+            >
+              {createLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowLeftRight size={14} />}
+              Send Trade
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewTradeOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleCreateTrade}
-            disabled={createLoading || !receiver || (offerItems.length === 0 && requestItems.length === 0 && !offerBalance && !requestBalance)}
-          >
-            {createLoading ? <CircularProgress size={14} sx={{ mr: 1 }} /> : <SwapHorizIcon sx={{ mr: 0.5, fontSize: 18 }} />}
-            Send Trade
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   )
 }

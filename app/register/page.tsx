@@ -3,10 +3,13 @@
 import { useState } from "react"
 import NextLink from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  Container, Box, Card, CardContent, Typography,
-  TextField, Button, Alert, CircularProgress, Divider,
-} from "@mui/material"
+import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Card, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
 
 export default function RegisterPage() {
@@ -31,64 +34,44 @@ export default function RegisterPage() {
   }
 
   return (
-    <Container maxWidth="xs" sx={{ py: 8 }}>
-      <Box textAlign="center" mb={3}>
-        <Box
-          component="img"
+    <div className="max-w-sm mx-auto px-4 py-16">
+      <div className="text-center mb-6">
+        <img
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
           alt="OmegaCases"
-          sx={{ width: 64, height: 64, mb: 1 }}
+          className="w-16 h-16 mx-auto mb-3"
         />
-        <Typography variant="h5" fontWeight={700}>Create Account</Typography>
-      </Box>
+        <h1 className="text-2xl font-bold">Create Account</h1>
+      </div>
       <Card>
-        <CardContent sx={{ p: 3 }}>
-          <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoFocus
-              helperText="3–20 characters"
-              fullWidth
-            />
-            <TextField
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              fullWidth
-            />
-            <TextField
-              label="Confirm Password"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              fullWidth
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={18} /> : null}
-            >
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>Username</Label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus />
+              <p className="text-xs text-muted-foreground">3–20 characters</p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Password</Label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Confirm Password</Label>
+              <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+            </div>
+            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+            <Button type="submit" size="lg" disabled={loading} className="gap-2">
+              {loading && <Loader2 size={16} className="animate-spin" />}
               {loading ? "Creating…" : "Create Account"}
             </Button>
-          </Box>
-          <Divider sx={{ my: 2 }} />
-          <Typography variant="body2" textAlign="center" color="text.secondary">
+          </form>
+          <Separator className="my-4" />
+          <p className="text-sm text-center text-muted-foreground">
             Have an account?{" "}
-            <NextLink href="/login" style={{ color: "#1976d2", fontWeight: 600 }}>
-              Sign in
-            </NextLink>
-          </Typography>
+            <NextLink href="/login" className="text-primary font-semibold hover:underline">Sign in</NextLink>
+          </p>
         </CardContent>
       </Card>
-    </Container>
+    </div>
   )
 }

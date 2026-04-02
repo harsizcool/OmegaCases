@@ -1,7 +1,7 @@
 "use client"
-// cache-bust: single-export-v3
-import { Box, Chip, Tooltip, Typography } from "@mui/material"
-import AccessTimeIcon from "@mui/icons-material/AccessTime"
+
+import { Clock } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
 
@@ -18,95 +18,62 @@ export default function ItemCard({ item, size = "md", showPrice = false, onClick
   const glow = RARITY_GLOW?.[item.rarity as Rarity] ?? "none"
 
   return (
-    <Box
+    <div
       onClick={onClick}
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 0.5,
-        cursor: onClick ? "pointer" : "default",
-        "&:hover": onClick ? { transform: "translateY(-2px)", transition: "transform 0.15s" } : {},
-      }}
+      className={`flex flex-col items-center gap-1 ${onClick ? "cursor-pointer hover:-translate-y-0.5 transition-transform duration-150" : ""}`}
     >
-      <Box sx={{ position: "relative" }}>
-        <Box
-          sx={{
-            width: dims,
-            height: dims,
-            borderRadius: 2,
-            overflow: "hidden",
-            border: `2px solid ${color}`,
-            boxShadow: glow,
-            bgcolor: "#f0f7ff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+      <div className="relative">
+        <div
+          style={{ width: dims, height: dims, borderColor: color, boxShadow: glow }}
+          className="rounded-lg overflow-hidden border-2 bg-blue-50 dark:bg-slate-800 flex items-center justify-center"
         >
-          <Box
-            component="img"
+          <img
             src={item.image_url}
             alt={item.name}
-            sx={{ width: "90%", height: "90%", objectFit: "contain" }}
+            style={{ width: "90%", height: "90%" }}
+            className="object-contain"
           />
-        </Box>
+        </div>
         {item.limited_time && (
-          <Tooltip title="Limited time — not available in cases" placement="top" arrow>
-            <Box
-              sx={{
-                position: "absolute",
-                top: 4,
-                right: 4,
-                bgcolor: "rgba(0,0,0,0.6)",
-                borderRadius: "50%",
-                width: 20,
-                height: 20,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <AccessTimeIcon sx={{ fontSize: 13, color: "#ffd54f" }} />
-            </Box>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute top-1 right-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center">
+                  <Clock size={11} className="text-yellow-300" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Limited time — not available in cases</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
-      </Box>
+      </div>
 
-      <Chip
-        label={item.rarity}
-        size="small"
-        sx={{
-          bgcolor: color,
-          color: "#fff",
-          fontSize: "0.65rem",
-          height: 18,
-          "& .MuiChip-label": { px: 0.8 },
-        }}
-      />
+      <span
+        className="text-white text-[0.65rem] font-semibold px-1.5 py-0.5 rounded-full"
+        style={{ backgroundColor: color }}
+      >
+        {item.rarity}
+      </span>
 
-      <Tooltip title={item.name} placement="top" arrow>
-        <Typography
-          variant="caption"
-          textAlign="center"
-          fontWeight={600}
-          sx={{
-            lineHeight: 1.2,
-            maxWidth: dims,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {item.name}
-        </Typography>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="text-xs font-semibold text-center leading-tight overflow-hidden text-ellipsis whitespace-nowrap block"
+              style={{ maxWidth: dims }}
+            >
+              {item.name}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{item.name}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {showPrice && (
-        <Typography variant="caption" color="primary.main" fontWeight={700}>
+        <span className="text-xs font-bold text-primary">
           ${Number(item.market_price).toFixed(2)}
-        </Typography>
+        </span>
       )}
-    </Box>
+    </div>
   )
 }

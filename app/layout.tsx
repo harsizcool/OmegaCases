@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import MuiProvider from '@/components/mui-provider'
+import AppProvider from '@/components/app-provider'
 import Navbar from '@/components/navbar'
 import LiveRollsFeed from '@/components/live-rolls-feed'
 import DiscountBanner from '@/components/discount-banner'
+import FooterWrapper from '@/components/footer-wrapper'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1976d2',
+  themeColor: '#5865f2',
   userScalable: false,
 }
 
@@ -28,16 +29,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Geologica:wght,CRSV@100..900,0&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body suppressHydrationWarning>
-        <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <MuiProvider>
-            <Navbar />
-            <DiscountBanner />
-            <div style={{ display: "flex", alignItems: "flex-start" }}>
-              <main style={{ flex: 1, minWidth: 0, backgroundColor: "inherit" }} className="pb-[44px] lg:pb-0">{children}</main>
-              <LiveRollsFeed />
+        <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <AppProvider>
+            <div className="min-h-screen flex flex-col">
+              <Navbar />
+              <DiscountBanner />
+              <div className="flex flex-1 items-start">
+                <main className="flex-1 min-w-0 pb-[44px] lg:pb-0">{children}</main>
+                <LiveRollsFeed />
+              </div>
+              <FooterWrapper />
             </div>
-          </MuiProvider>
+          </AppProvider>
         </NextThemesProvider>
         <Analytics />
       </body>

@@ -1,25 +1,18 @@
 "use client"
-// v3 - dark mode + Plus badge
+
 import { useState, useRef, useEffect } from "react"
-import {
-  Box, Container, Typography, Paper, Avatar, Button,
-  TextField, Divider, Alert, Chip, CircularProgress,
-  Stack, Switch, FormControlLabel, Tooltip,
-} from "@mui/material"
-import CameraAltIcon from "@mui/icons-material/CameraAlt"
-import PersonIcon from "@mui/icons-material/Person"
-import SettingsIcon from "@mui/icons-material/Settings"
-import VolumeOffIcon from "@mui/icons-material/VolumeOff"
-import VolumeUpIcon from "@mui/icons-material/VolumeUp"
-import DarkModeIcon from "@mui/icons-material/DarkMode"
-import LightModeIcon from "@mui/icons-material/LightMode"
-import LockIcon from "@mui/icons-material/Lock"
-import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
 import NextLink from "next/link"
-import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { Camera, User, Settings, VolumeX, Volume2, Crown, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/lib/auth-context"
 import { useMuteSounds } from "@/lib/use-mute-sounds"
-import { useThemeMode } from "@/components/mui-provider"
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth()
@@ -34,7 +27,6 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("")
   const [error, setError] = useState("")
   const { muted, toggle: toggleMute } = useMuteSounds()
-  const { mode, toggleMode } = useThemeMode()
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => { if (user) setUsername(user.username) }, [user])
@@ -43,14 +35,10 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <Container maxWidth="sm" sx={{ py: 10, textAlign: "center" }}>
-        <Typography variant="h6" color="text.secondary">
-          You must be logged in to view settings.
-        </Typography>
-        <Button variant="contained" sx={{ mt: 2 }} onClick={() => router.push("/login")}>
-          Login
-        </Button>
-      </Container>
+      <div className="max-w-sm mx-auto px-4 py-20 text-center">
+        <p className="text-muted-foreground mb-4">You must be logged in to view settings.</p>
+        <Button onClick={() => router.push("/login")}>Login</Button>
+      </div>
     )
   }
 
@@ -92,132 +80,114 @@ export default function SettingsPage() {
   const avatarSrc = avatarPreview ?? user.profile_picture ?? undefined
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
-        <SettingsIcon sx={{ fontSize: 32, color: "primary.main" }} />
-        <Typography variant="h4" fontWeight={700}>Settings</Typography>
-      </Box>
+    <div className="max-w-lg mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-8">
+        <Settings size={28} className="text-primary" />
+        <h1 className="text-3xl font-bold">Settings</h1>
+      </div>
 
-      <Paper elevation={0} sx={{ border: "1px solid #e3f2fd", borderRadius: 3, overflow: "hidden" }}>
-        <Box sx={{ bgcolor: "#f0f7ff", px: 4, py: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Box sx={{ position: "relative", display: "inline-flex" }}>
-            <Avatar src={avatarSrc} sx={{ width: 100, height: 100, fontSize: 40, bgcolor: "primary.main", border: "3px solid #fff", boxShadow: 2 }}>
-              {!avatarSrc && user.username[0].toUpperCase()}
+      <div className="border border-border rounded-2xl overflow-hidden">
+        {/* Profile header */}
+        <div className="bg-muted px-6 py-8 flex flex-col items-center gap-3">
+          <div className="relative">
+            <Avatar className="w-24 h-24 border-4 border-background shadow-md">
+              {avatarSrc && <AvatarImage src={avatarSrc} />}
+              <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
+                {user.username[0].toUpperCase()}
+              </AvatarFallback>
             </Avatar>
-            <Box onClick={handleAvatarClick} sx={{ position: "absolute", bottom: 0, right: 0, bgcolor: "primary.main", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #fff", "&:hover": { bgcolor: "primary.dark" }, transition: "background 0.2s" }}>
-              <CameraAltIcon sx={{ fontSize: 16, color: "#fff" }} />
-            </Box>
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: "none" }} onChange={handleFileChange} />
-          </Box>
-          <Box sx={{ textAlign: "center" }}>
-            <Typography variant="h6" fontWeight={600}>{user.username}</Typography>
-            <Typography variant="body2" color="text.secondary">{user.admin ? "Administrator" : "Member"}</Typography>
+            <button
+              onClick={handleAvatarClick}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center border-2 border-background hover:bg-primary/90 transition-colors"
+            >
+              <Camera size={14} className="text-primary-foreground" />
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFileChange} />
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-semibold">{user.username}</p>
+            <p className="text-sm text-muted-foreground">{user.admin ? "Administrator" : "Member"}</p>
             {user.plus && (
-              <Chip
-                icon={<WorkspacePremiumIcon sx={{ fontSize: "1rem !important", color: "#f59e0b !important" }} />}
-                label="OmegaCases Plus"
-                size="small"
-                sx={{ mt: 0.75, bgcolor: "#fffbeb", border: "1px solid #f59e0b", color: "#d97706", fontWeight: 700 }}
-              />
+              <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-amber-600 border border-amber-400 rounded-full px-2 py-0.5 bg-amber-50 dark:bg-amber-950/30">
+                <Crown size={11} className="text-amber-500" /> OmegaCases Plus
+              </span>
             )}
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Chip label={`$${Number(user.balance).toFixed(2)} balance`} color="primary" variant="outlined" size="small" />
-            <Chip label={`${user.cases ?? 0} cases opened`} variant="outlined" size="small" />
-          </Stack>
-        </Box>
+          </div>
+          <div className="flex gap-2">
+            <span className="text-xs border border-primary text-primary rounded-full px-2 py-0.5 font-semibold">${Number(user.balance).toFixed(2)} balance</span>
+            <span className="text-xs border border-border rounded-full px-2 py-0.5 font-semibold">{user.cases ?? 0} cases opened</span>
+          </div>
+        </div>
 
-        <Divider />
+        <Separator />
 
-        <Box sx={{ px: 4, py: 4 }}>
-          {success && <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess("")}>{success}</Alert>}
-          {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>{error}</Alert>}
+        <div className="px-6 py-6 flex flex-col gap-6">
+          {success && <Alert><AlertDescription className="text-green-600">{success}</AlertDescription></Alert>}
+          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
-          <Stack spacing={3}>
-            <Box>
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <PersonIcon fontSize="small" sx={{ color: "primary.main" }} /> Username
-              </Typography>
-              <TextField fullWidth value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your username" size="small" inputProps={{ maxLength: 32 }} helperText="This also changes your profile URL (/user/username)" />
-            </Box>
+          {/* Username */}
+          <div className="flex flex-col gap-2">
+            <Label className="flex items-center gap-1.5 font-semibold">
+              <User size={14} className="text-primary" /> Username
+            </Label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Your username"
+              maxLength={32}
+            />
+            <p className="text-xs text-muted-foreground">This also changes your profile URL (/user/username)</p>
+          </div>
 
-            <Box>
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <CameraAltIcon fontSize="small" sx={{ color: "primary.main" }} /> Profile Picture
-              </Typography>
-              <Box onClick={handleAvatarClick} sx={{ border: "2px dashed #90caf9", borderRadius: 2, py: 3, textAlign: "center", cursor: "pointer", bgcolor: avatarFile ? "#f0f7ff" : "#fafafa", "&:hover": { borderColor: "primary.main", bgcolor: "#f0f7ff" }, transition: "all 0.2s" }}>
-                {avatarFile ? (
-                  <Box>
-                    <Typography variant="body2" color="primary" fontWeight={600}>{avatarFile.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{(avatarFile.size / 1024).toFixed(0)} KB — Click to change</Typography>
-                  </Box>
-                ) : (
-                  <Box>
-                    <CameraAltIcon sx={{ fontSize: 28, color: "#90caf9", mb: 0.5 }} />
-                    <Typography variant="body2" color="text.secondary">Click to upload a new profile picture</Typography>
-                    <Typography variant="caption" color="text.secondary">JPEG, PNG, WebP or GIF — max 5MB</Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
+          {/* Avatar upload */}
+          <div className="flex flex-col gap-2">
+            <Label className="flex items-center gap-1.5 font-semibold">
+              <Camera size={14} className="text-primary" /> Profile Picture
+            </Label>
+            <button
+              onClick={handleAvatarClick}
+              className={`border-2 border-dashed rounded-xl py-6 text-center transition-all ${avatarFile ? "border-primary bg-primary/5" : "border-border hover:border-primary hover:bg-primary/5"}`}
+            >
+              {avatarFile ? (
+                <div>
+                  <p className="text-sm text-primary font-semibold">{avatarFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{(avatarFile.size / 1024).toFixed(0)} KB — Click to change</p>
+                </div>
+              ) : (
+                <div>
+                  <Camera size={24} className="mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload a new profile picture</p>
+                  <p className="text-xs text-muted-foreground">JPEG, PNG, WebP or GIF — max 5MB</p>
+                </div>
+              )}
+            </button>
+          </div>
 
-            <Divider />
+          <Separator />
 
-            <Box>
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                {muted
-                  ? <VolumeOffIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                  : <VolumeUpIcon fontSize="small" sx={{ color: "primary.main" }} />
-                }
-                Sound
-              </Typography>
-              <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2 }}>
-                <FormControlLabel
-                  control={<Switch checked={muted} onChange={toggleMute} />}
-                  label={
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>Mute all sounds</Typography>
-                      <Typography variant="caption" color="text.secondary">Disables tick sounds and win effects while opening cases</Typography>
-                    </Box>
-                  }
-                  sx={{ m: 0, width: "100%" }}
-                  labelPlacement="start"
-                />
-              </Paper>
-            </Box>
+          {/* Sound */}
+          <div className="flex flex-col gap-2">
+            <Label className="flex items-center gap-1.5 font-semibold">
+              {muted ? <VolumeX size={14} className="text-muted-foreground" /> : <Volume2 size={14} className="text-primary" />}
+              Sound
+            </Label>
+            <div className="flex items-center justify-between p-3 border border-border rounded-xl">
+              <div>
+                <p className="text-sm font-semibold">Mute all sounds</p>
+                <p className="text-xs text-muted-foreground">Disables tick sounds and win effects while opening cases</p>
+              </div>
+              <Switch checked={muted} onCheckedChange={toggleMute} />
+            </div>
+          </div>
 
-            <Divider />
+          <Separator />
 
-            {/* Dark mode — under maintenance */}
-            <Box sx={{ opacity: 0.45, pointerEvents: "none", userSelect: "none" }}>
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <DarkModeIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                Theme
-                <Chip label="Under Maintenance" size="small" sx={{ ml: 1, fontSize: "0.65rem", height: 18, bgcolor: "grey.300", color: "grey.700" }} />
-              </Typography>
-              <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2 }}>
-                <FormControlLabel
-                  control={<Switch disabled color="warning" />}
-                  label={
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>Dark Mode</Typography>
-                      <Typography variant="caption" color="text.secondary">Currently under maintenance — check back soon.</Typography>
-                    </Box>
-                  }
-                  sx={{ m: 0, width: "100%" }}
-                  labelPlacement="start"
-                />
-              </Paper>
-            </Box>
-
-            <Divider />
-            <Button variant="contained" size="large" onClick={handleSave} disabled={saving} sx={{ fontWeight: 700, display: "flex", gap: 1, alignItems: "center" }}>
-              {saving && <CircularProgress size={16} sx={{ color: "inherit" }} />}
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </Stack>
-        </Box>
-      </Paper>
-    </Container>
+          <Button size="lg" className="gap-2 font-bold" onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

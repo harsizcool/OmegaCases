@@ -2,18 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import NextLink from "next/link"
-import {
-  IconButton, Badge, Popover, Box, Typography, Divider,
-  Button, List, ListItem, ListItemText, Tooltip, Chip,
-} from "@mui/material"
-import NotificationsIcon from "@mui/icons-material/Notifications"
-import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone"
-import DoneAllIcon from "@mui/icons-material/DoneAll"
-import ShoppingBagIcon from "@mui/icons-material/ShoppingBag"
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
-import CampaignIcon from "@mui/icons-material/Campaign"
-import CheckCircleIcon from "@mui/icons-material/CheckCircle"
-import CancelIcon from "@mui/icons-material/Cancel"
+import { Bell, CheckCheck, ShoppingBag, ArrowLeftRight, Megaphone, CheckCircle, XCircle } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 
 interface Notification {
   id: string
@@ -25,14 +17,14 @@ interface Notification {
   created_at: string
 }
 
-function typeIcon(type: string) {
+function TypeIcon({ type }: { type: string }) {
   switch (type) {
-    case "item_sold": return <ShoppingBagIcon sx={{ fontSize: 16, color: "#16a34a" }} />
-    case "trade_received": return <SwapHorizIcon sx={{ fontSize: 16, color: "#2563eb" }} />
-    case "trade_accepted": return <CheckCircleIcon sx={{ fontSize: 16, color: "#16a34a" }} />
+    case "item_sold": return <ShoppingBag size={14} className="text-green-600" />
+    case "trade_received": return <ArrowLeftRight size={14} className="text-blue-600" />
+    case "trade_accepted": return <CheckCircle size={14} className="text-green-600" />
     case "trade_declined":
-    case "trade_cancelled": return <CancelIcon sx={{ fontSize: 16, color: "#dc2626" }} />
-    default: return <CampaignIcon sx={{ fontSize: 16, color: "#d97706" }} />
+    case "trade_cancelled": return <XCircle size={14} className="text-red-600" />
+    default: return <Megaphone size={14} className="text-amber-600" />
   }
 }
 
@@ -46,12 +38,9 @@ function timeAgo(dateStr: string) {
 
 export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
+  const [open, setOpen] = useState(false)
 
   const unread = notifications.filter((n) => !n.read).length
-  const badgeCount = unread > 99 ? 99 : unread
-  const badgeLabel = unread > 99 ? "99+" : undefined
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -61,17 +50,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
     } catch {}
   }, [userId])
 
-  // Poll every 8 seconds
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 8000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
 
-  const handleOpen = (e: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(e.currentTarget)
-    // Mark all as read when opening
-    if (unread > 0) {
+  const handleOpen = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (isOpen && unread > 0) {
       fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,8 +68,6 @@ export default function NotificationBell({ userId }: { userId: string }) {
       })
     }
   }
-
-  const handleClose = () => setAnchorEl(null)
 
   const markOneRead = (id: string) => {
     fetch("/api/notifications", {
@@ -94,55 +79,26 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }
 
   return (
-    <>
-      <Tooltip title="Notifications" placement="bottom" arrow>
-        <IconButton size="small" onClick={handleOpen} sx={{ flexShrink: 0 }}>
-          <Badge
-            badgeContent={badgeLabel ?? badgeCount}
-            color="error"
-            max={99}
-            sx={{
-              "& .MuiBadge-badge": {
-                fontSize: "0.65rem",
-                minWidth: 16,
-                height: 16,
-                px: 0.5,
-              },
-            }}
-          >
-            {unread > 0
-              ? <NotificationsIcon sx={{ fontSize: 22, color: "primary.main" }} />
-              : <NotificationsNoneIcon sx={{ fontSize: 22, color: "text.secondary" }} />
-            }
-          </Badge>
-        </IconButton>
-      </Tooltip>
-
-      <Popover
-        open={open}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{
-          sx: {
-            width: 340,
-            maxHeight: 480,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            borderRadius: 2,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-          },
-        }}
-      >
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <button className="relative p-1.5 rounded-md hover:bg-accent transition-colors shrink-0">
+          <Bell size={20} className={unread > 0 ? "text-primary" : "text-muted-foreground"} />
+          {unread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[0.6rem] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[340px] max-h-[480px] overflow-hidden flex flex-col p-0 rounded-xl shadow-xl">
         {/* Header */}
-        <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid", borderColor: "divider" }}>
-          <Typography fontWeight={700} fontSize="0.95rem">Notifications</Typography>
+        <div className="px-4 py-3 flex items-center justify-between border-b border-border shrink-0">
+          <span className="font-bold text-sm">Notifications</span>
           {notifications.some((n) => !n.read) && (
             <Button
-              size="small"
-              startIcon={<DoneAllIcon sx={{ fontSize: 14 }} />}
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 gap-1"
               onClick={() => {
                 fetch("/api/notifications", {
                   method: "POST",
@@ -151,66 +107,65 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 })
                 setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
               }}
-              sx={{ fontSize: "0.75rem", py: 0.25 }}
             >
+              <CheckCheck size={12} />
               Mark all read
             </Button>
           )}
-        </Box>
+        </div>
 
         {/* List */}
-        <Box sx={{ overflowY: "auto", flex: 1 }}>
+        <div className="overflow-y-auto flex-1">
           {notifications.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: "center" }}>
-              <NotificationsNoneIcon sx={{ fontSize: 36, color: "text.disabled", mb: 1 }} />
-              <Typography variant="body2" color="text.secondary">No notifications yet</Typography>
-            </Box>
+            <div className="p-8 text-center flex flex-col items-center gap-2">
+              <Bell size={32} className="text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
+            </div>
           ) : (
-            <List disablePadding>
+            <ul>
               {notifications.map((n, i) => (
-                <Box key={n.id}>
-                  <ListItem
-                    component={n.link ? NextLink : "div"}
-                    href={n.link ?? undefined}
-                    onClick={() => { markOneRead(n.id); handleClose() }}
-                    sx={{
-                      px: 2,
-                      py: 1.25,
-                      bgcolor: n.read ? "transparent" : "action.hover",
-                      cursor: "pointer",
-                      "&:hover": { bgcolor: "action.selected" },
-                      alignItems: "flex-start",
-                      gap: 1.25,
-                      textDecoration: "none",
-                      color: "inherit",
-                      display: "flex",
-                    }}
-                  >
-                    <Box sx={{ mt: 0.25, flexShrink: 0 }}>{typeIcon(n.type)}</Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "space-between" }}>
-                        <Typography variant="body2" fontWeight={n.read ? 400 : 700} noWrap>
-                          {n.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0 }}>
-                          {timeAgo(n.created_at)}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4 }}>
-                        {n.body}
-                      </Typography>
-                    </Box>
-                    {!n.read && (
-                      <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0, mt: 0.75 }} />
-                    )}
-                  </ListItem>
-                  {i < notifications.length - 1 && <Divider />}
-                </Box>
+                <li key={n.id}>
+                  {n.link ? (
+                    <NextLink
+                      href={n.link}
+                      onClick={() => { markOneRead(n.id); setOpen(false) }}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-accent transition-colors no-underline text-inherit ${n.read ? "" : "bg-accent/50"}`}
+                    >
+                      <NotificationRow n={n} />
+                    </NextLink>
+                  ) : (
+                    <div
+                      onClick={() => markOneRead(n.id)}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-accent transition-colors ${n.read ? "" : "bg-accent/50"}`}
+                    >
+                      <NotificationRow n={n} />
+                    </div>
+                  )}
+                  {i < notifications.length - 1 && <Separator />}
+                </li>
               ))}
-            </List>
+            </ul>
           )}
-        </Box>
-      </Popover>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function NotificationRow({ n }: { n: { type: string; title: string; body: string; created_at: string; read: boolean } }) {
+  return (
+    <>
+      <div className="mt-0.5 shrink-0"><TypeIcon type={n.type} /></div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`text-sm truncate ${n.read ? "font-normal" : "font-bold"}`}>{n.title}</span>
+          <span className="text-[0.65rem] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-snug">{n.body}</p>
+      </div>
+      {!n.read && (
+        <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1" />
+      )}
     </>
   )
 }

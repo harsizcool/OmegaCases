@@ -1,49 +1,223 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
-  AppBar, Toolbar, Box, Button, Typography, IconButton,
-  Avatar, Menu, MenuItem, Chip, Divider, Tooltip,
-  Drawer, List, ListItem, ListItemText, ListItemButton,
-  Badge, InputBase,
-} from "@mui/material"
-import MenuIcon from "@mui/icons-material/Menu"
-import WorkspacesIcon from "@mui/icons-material/Workspaces"
-import SearchIcon from "@mui/icons-material/Search"
-import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium"
-import DarkModeIcon from "@mui/icons-material/DarkMode"
-import LightModeIcon from "@mui/icons-material/LightMode"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
-import { useThemeMode } from "./mui-provider"
+import { useThemeMode } from "./app-provider"
+import { useOnlineUsers } from "@/lib/use-online-users"
 import DepositWithdrawModal from "./deposit-withdraw-modal"
 import NotificationBell from "./notification-bell"
+
+const NAV_LINKS = [
+  { href: "/open",        label: "Cases",       icon: Layers },
+  { href: "/marketplace", label: "Marketplace", icon: Store },
+  { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+]
+
+interface SearchResult {
+  type: "item" | "user"
+  id: string
+  name: string
+  image?: string
+  sub?: string
+}
+
+function SearchBar({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter()
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const fetchPredictions = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); setOpen(false); return }
+    setLoading(true)
+    try {
+      const [itemsRes, usersRes] = await Promise.all([
+        fetch(`/api/search?query=${encodeURIComponent(q)}&type=items&limit=4`),
+        fetch(`/api/search?query=${encodeURIComponent(q)}&type=users&limit=3`),
+      ])
+      const items = itemsRes.ok ? await itemsRes.json() : []
+      const users = usersRes.ok ? await usersRes.json() : []
+
+      const mapped: SearchResult[] = [
+        ...((Array.isArray(items?.items) ? items.items : Array.isArray(items) ? items : []).map((i: any) => ({
+          type: "item" as const,
+          id: i.id,
+          name: i.name,
+          image: i.image_url,
+          sub: `$${Number(i.market_price || 0).toFixed(2)} · ${i.rarity}`,
+        }))),
+        ...((Array.isArray(users?.users) ? users.users : Array.isArray(users) ? users : []).map((u: any) => ({
+          type: "user" as const,
+          id: u.id,
+          name: u.username,
+          image: u.profile_picture,
+          sub: u.plus ? "Plus member" : "Member",
+        }))),
+      ]
+      setResults(mapped)
+      setOpen(mapped.length > 0 || q.trim().length > 0)
+    } catch {
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleChange = (val: string) => {
+    setQuery(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!val.trim()) { setResults([]); setOpen(false); return }
+    debounceRef.current = setTimeout(() => fetchPredictions(val), 320)
+  }
+
+  const handleSubmit = (q: string) => {
+    if (!q.trim()) return
+    router.push(`/search?query=${encodeURIComponent(q.trim())}`)
+    setQuery("")
+    setResults([])
+    setOpen(false)
+    onNavigate?.()
+  }
+
+  const handleResultClick = (r: SearchResult) => {
+    if (r.type === "item") router.push(`/item/${encodeURIComponent(r.name)}`)
+    else router.push(`/user/${r.name}`)
+    setQuery("")
+    setResults([])
+    setOpen(false)
+    onNavigate?.()
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  return (
+    <div ref={wrapRef} className="relative w-full">
+      <div className={`flex items-center gap-2 bg-muted/60 border rounded-lg px-3 py-1.5 transition-colors ${open ? "border-primary/50 bg-muted" : "border-border/60 hover:border-border"}`}>
+        <Search size={14} className="text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Search items, users..."
+          value={query}
+          onChange={(e) => handleChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(query); if (e.key === "Escape") { setOpen(false); inputRef.current?.blur() } }}
+          onFocus={() => { if (query.trim()) setOpen(true) }}
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 text-foreground min-w-0"
+        />
+        {query && (
+          <button onClick={() => { setQuery(""); setResults([]); setOpen(false) }} className="text-muted-foreground hover:text-foreground">
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute top-full mt-1.5 left-0 right-0 bg-popover border border-border/60 rounded-xl shadow-xl shadow-black/30 z-50 overflow-hidden">
+          {/* Static quick-search shortcuts */}
+          {query.trim() && (
+            <div className="border-b border-border/40">
+              <button onClick={() => handleSubmit(query)} className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm hover:bg-muted transition-colors text-left">
+                <Search size={13} className="text-muted-foreground shrink-0" />
+                <span>Search <strong>"{query}"</strong> in Items</span>
+              </button>
+              <button onClick={() => router.push(`/search?query=${encodeURIComponent(query.trim())}&tab=users`) || (setOpen(false), setQuery(""))} className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm hover:bg-muted transition-colors text-left">
+                <User size={13} className="text-muted-foreground shrink-0" />
+                <span>Search <strong>"{query}"</strong> in Users</span>
+              </button>
+            </div>
+          )}
+
+          {/* Actual results */}
+          {results.length > 0 && (
+            <div className="py-1">
+              {results.filter(r => r.type === "item").length > 0 && (
+                <>
+                  <p className="px-3 py-1 text-[0.65rem] font-bold text-muted-foreground uppercase tracking-wider">Items</p>
+                  {results.filter(r => r.type === "item").map((r) => (
+                    <button key={r.id} onClick={() => handleResultClick(r)} className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted transition-colors text-left">
+                      {r.image && <img src={r.image} alt={r.name} className="w-8 h-8 object-contain rounded shrink-0 bg-muted" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{r.name}</p>
+                        {r.sub && <p className="text-xs text-muted-foreground">{r.sub}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+              {results.filter(r => r.type === "user").length > 0 && (
+                <>
+                  <p className="px-3 py-1 text-[0.65rem] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Users</p>
+                  {results.filter(r => r.type === "user").map((r) => (
+                    <button key={r.id} onClick={() => handleResultClick(r)} className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted transition-colors text-left">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0 overflow-hidden">
+                        {r.image ? <img src={r.image} alt={r.name} className="w-full h-full object-cover" /> : r.name[0]?.toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{r.name}</p>
+                        {r.sub && <p className="text-xs text-muted-foreground">{r.sub}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {loading && !results.length && (
+            <p className="px-3 py-3 text-sm text-muted-foreground text-center">Searching…</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const { mode, toggleMode } = useThemeMode()
   const router = useRouter()
+  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [pendingTrades, setPendingTrades] = useState(0)
-  const [searchQuery, setSearchQuery] = useState("")
-
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
+  const onlineCount = useOnlineUsers(user?.id)
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Poll for pending received trades every 30s
   useEffect(() => {
     if (!user) return
     const fetchPending = async () => {
       try {
         const res = await fetch(`/api/trades?user_id=${user.id}`)
         const data = await res.json()
-        if (data?.received) {
-          setPendingTrades(data.received.filter((t: any) => t.status === "pending").length)
-        }
+        if (data?.received) setPendingTrades(data.received.filter((t: any) => t.status === "pending").length)
       } catch {}
     }
     fetchPending()
@@ -51,309 +225,236 @@ export default function Navbar() {
     return () => clearInterval(interval)
   }, [user])
 
-  const handleUserMenu = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)
-  const handleCloseMenu = () => setAnchorEl(null)
-
-  const handleLogout = async () => {
-    handleCloseMenu()
-    await logout()
-    router.push("/")
-  }
-
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const q = searchQuery.trim()
-      router.push(q ? `/search?query=${encodeURIComponent(q)}` : "/search")
-      setSearchQuery("")
-    }
-  }
+  const handleLogout = async () => { await logout(); router.push("/") }
+  const isActive = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(href))
 
   return (
     <>
-      <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{
-          backgroundColor: "#fff",
-          borderBottom: "1px solid #e3f2fd",
-          color: "text.primary",
-        }}
-      >
-        <Toolbar sx={{ minHeight: { xs: 56, md: 64 }, px: { xs: 1, md: 2 }, display: "flex", alignItems: "center" }}>
-          {/* LEFT: logo + nav links + Cases */}
-          <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
-            <Box
-              component={NextLink}
-              href="/"
-              sx={{ display: "flex", alignItems: "center", gap: 1, textDecoration: "none", mr: 1, flexShrink: 0 }}
+      <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-card/90 backdrop-blur-md shadow-sm shadow-black/20">
+        <div className="flex items-center h-14 px-3 md:px-5 gap-2 md:gap-3">
+
+          {/* Logo */}
+          <NextLink href="/" className="flex items-center gap-2 shrink-0">
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
+              alt="OmegaCases"
+              className="w-8 h-8"
+            />
+            <span className="hidden lg:block text-[0.92rem] font-bold tracking-tight whitespace-nowrap">
+              Omega<span className="text-primary">Cases</span>
+            </span>
+          </NextLink>
+
+          <Separator orientation="vertical" className="hidden lg:block h-5 bg-border/40 mx-1" />
+
+          {/* Online users pill — only shown when signed in */}
+          {mounted && user && onlineCount > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 bg-green-500/10 border border-green-500/25 rounded-full px-2.5 py-1 shrink-0">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-[0.65rem] font-bold text-green-400 tabular-nums">
+                {onlineCount.toLocaleString()} online
+              </span>
+            </div>
+          )}
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-0.5 shrink-0">
+            {NAV_LINKS.map(({ href, label, icon: Icon }) => {
+              const active = isActive(href)
+              return (
+                <NextLink
+                  key={href}
+                  href={href}
+                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                  {label === "Trade" && mounted && user && pendingTrades > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5">
+                      {pendingTrades}
+                    </span>
+                  )}
+                </NextLink>
+              )
+            })}
+            <NextLink
+              href="/plus"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold transition-colors ${
+                isActive("/plus") ? "bg-amber-500/15 text-amber-400" : "text-amber-400 hover:bg-amber-500/10"
+              }`}
             >
-              <Box
-                component="img"
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
-                alt="OmegaCases"
-                sx={{ width: 36, height: 36 }}
-              />
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 700, color: "primary.main", display: { xs: "none", sm: "block" }, whiteSpace: "nowrap" }}
-              >
-                OmegaCases
-              </Typography>
-            </Box>
+              <Crown size={14} /> Plus
+            </NextLink>
+          </nav>
 
-            {/* Desktop nav links */}
-            <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5, flexShrink: 0 }}>
-              <Button
-                component={NextLink}
-                href="/marketplace"
-                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-              >
-                Marketplace
-              </Button>
-              <Button
-                component={NextLink}
-                href="/trade"
-                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-              >
-                <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
-                  <Box sx={{ pr: pendingTrades > 0 ? 1 : 0 }}>Trade</Box>
-                </Badge>
-              </Button>
-              <Button
-                component={NextLink}
-                href="/leaderboard"
-                sx={{ color: "text.primary", "&:hover": { color: "primary.main" } }}
-              >
-                Leaderboard
-              </Button>
-              <Button
-                component={NextLink}
-                href="/plus"
-                startIcon={<WorkspacePremiumIcon sx={{ color: "#f59e0b" }} />}
-                sx={{ color: "#f59e0b", fontWeight: 700, "&:hover": { bgcolor: "#fffbeb" } }}
-              >
-                Plus
-              </Button>
-            </Box>
+          {/* Search — grows to fill center space */}
+          <div className="flex-1 min-w-0 max-w-xs hidden md:block">
+            <SearchBar />
+          </div>
 
-            <Button
-              component={NextLink}
-              href="/open"
-              variant="contained"
-              startIcon={<WorkspacesIcon />}
-              size="small"
-              sx={{ fontWeight: 700, ml: 0.5, flexShrink: 0, display: { xs: "none", md: "flex" } }}
-            >
-              Cases
-            </Button>
-          </Box>
-
-          {/* CENTER: search bar — always truly centered */}
-          <Box
-            sx={{
-              display: { xs: "none", md: "flex" },
-              justifyContent: "center",
-              alignItems: "center",
-              flexShrink: 0,
-              width: 340,
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                bgcolor: "#f0f7ff",
-                border: "1px solid #e3f2fd",
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                width: "100%",
-                gap: 1,
-              }}
-            >
-              <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-              <InputBase
-                placeholder="Search items, users, listings..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearch}
-                sx={{ flex: 1, fontSize: "0.875rem" }}
-              />
-            </Box>
-          </Box>
-
-          {/* RIGHT: balance + avatar + mobile hamburger */}
-          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, minWidth: 0 }}>
-            {/* Balance chip */}
+          {/* Right side */}
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
             {mounted && user && (
-              <Chip
-                label={`$${Number(user.balance).toFixed(2)}`}
-                color="primary"
-                variant="outlined"
+              <button
                 onClick={() => setDepositOpen(true)}
-                sx={{ fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", flexShrink: 0 }}
-              />
+                className="hidden sm:flex text-xs font-bold text-primary bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap"
+              >
+                ${Number(user.balance).toFixed(2)}
+              </button>
             )}
 
-            {/* User menu or login */}
             {mounted && (
               user ? (
                 <>
-                  {user.plus && (
-                    <Tooltip title="Under maintenance" placement="bottom" arrow>
-                      <span>
-                        <IconButton size="small" disabled sx={{ opacity: 0.4 }}>
-                          <DarkModeIcon sx={{ fontSize: 20, color: "text.disabled" }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  )}
                   <NotificationBell userId={user.id} />
-                  <IconButton onClick={handleUserMenu} size="small" sx={{ flexShrink: 0 }}>
-                    {user.profile_picture ? (
-                      <Avatar src={user.profile_picture} sx={{ width: 34, height: 34 }} />
-                    ) : (
-                      <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 16 }}>
-                        {user.username[0].toUpperCase()}
-                      </Avatar>
-                    )}
-                  </IconButton>
-                  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu}>
-                    <MenuItem component={NextLink} href={`/user/${user.username}`} onClick={handleCloseMenu}>
-                      My Inventory
-                    </MenuItem>
-                    <MenuItem component={NextLink} href="/settings" onClick={handleCloseMenu}>
-                      Settings
-                    </MenuItem>
-                    {user.admin && (
-                      <MenuItem component={NextLink} href="/admin" onClick={handleCloseMenu}>
-                        Admin Panel
-                      </MenuItem>
-                    )}
-                    <Divider />
-                    <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>Logout</MenuItem>
-                  </Menu>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="shrink-0 ring-2 ring-transparent hover:ring-primary/40 rounded-full transition-all">
+                        <Avatar className="w-8 h-8 cursor-pointer">
+                          {user.profile_picture && <AvatarImage src={user.profile_picture} />}
+                          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
+                            {user.username[0].toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 bg-popover border-border/60">
+                      <div className="px-3 py-2 border-b border-border/40">
+                        <p className="text-sm font-semibold truncate">{user.username}</p>
+                        <p className="text-xs text-muted-foreground">${Number(user.balance).toFixed(2)} balance</p>
+                      </div>
+                      <DropdownMenuItem asChild>
+                        <NextLink href={`/user/${user.username}`} className="flex items-center gap-2 cursor-pointer">
+                          <User size={13} /> My Inventory
+                        </NextLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <NextLink href="/settings" className="flex items-center gap-2 cursor-pointer">
+                          <Settings size={13} /> Settings
+                        </NextLink>
+                      </DropdownMenuItem>
+                      {user.admin && (
+                        <DropdownMenuItem asChild>
+                          <NextLink href="/admin" className="flex items-center gap-2 cursor-pointer">
+                            <ShieldCheck size={13} /> Admin Panel
+                          </NextLink>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator className="bg-border/40" />
+                      <DropdownMenuItem onClick={handleLogout} className="text-destructive gap-2 cursor-pointer focus:text-destructive">
+                        <LogOut size={13} /> Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               ) : (
-                <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                  <Button variant="outlined" size="small" component={NextLink} href="/login">Login</Button>
-                  <Button variant="contained" size="small" component={NextLink} href="/register"
-                    sx={{ display: { xs: "none", sm: "flex" } }}>
-                    Register
+                <div className="flex items-center gap-1.5">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
+                    <NextLink href="/login">Login</NextLink>
                   </Button>
-                </Box>
+                  <Button size="sm" asChild>
+                    <NextLink href="/register">Register</NextLink>
+                  </Button>
+                </div>
               )
             )}
 
             {/* Mobile hamburger */}
-            <IconButton
-              onClick={() => setMobileOpen(true)}
-              sx={{ display: { xs: "flex", md: "none" } }}
-            >
-              <MenuIcon />
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="md:hidden p-1.5 text-muted-foreground">
+                  <Menu size={20} />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 p-0 bg-card border-border/60">
+                <div className="p-4 border-b border-border/40">
+                  {mounted && user ? (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10">
+                        {user.profile_picture && <AvatarImage src={user.profile_picture} />}
+                        <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                          {user.username[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate">{user.username}</p>
+                        <button onClick={() => { setMobileOpen(false); setDepositOpen(true) }} className="text-xs text-primary font-semibold">
+                          ${Number(user.balance).toFixed(2)}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1" asChild><NextLink href="/login" onClick={() => setMobileOpen(false)}>Login</NextLink></Button>
+                      <Button size="sm" variant="outline" className="flex-1" asChild><NextLink href="/register" onClick={() => setMobileOpen(false)}>Register</NextLink></Button>
+                    </div>
+                  )}
+                </div>
 
-      {/* Mobile Drawer */}
-      <Drawer anchor="right" open={mobileOpen} onClose={() => setMobileOpen(false)}>
-        <Box sx={{ width: 260 }}>
-          {/* Mobile search */}
-          <Box sx={{ p: 2 }}>
-            <Box
-              sx={{
-                display: "flex", alignItems: "center",
-                bgcolor: "#f0f7ff", border: "1px solid #e3f2fd",
-                borderRadius: 2, px: 1.5, py: 0.75, gap: 1,
-              }}
-            >
-              <SearchIcon sx={{ color: "text.secondary", fontSize: 18 }} />
-              <InputBase
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const q = searchQuery.trim()
-                    router.push(q ? `/search?query=${encodeURIComponent(q)}` : "/search")
-                    setSearchQuery("")
-                    setMobileOpen(false)
-                  }
-                }}
-                sx={{ flex: 1, fontSize: "0.875rem" }}
-              />
-            </Box>
-          </Box>
-          <Divider />
-          <List>
-            <ListItem disablePadding>
-              <ListItemButton component={NextLink} href="/marketplace" onClick={() => setMobileOpen(false)}>
-                <ListItemText primary="Marketplace" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={NextLink} href="/trade" onClick={() => setMobileOpen(false)}>
-                <ListItemText
-                  primary={
-                    <Badge badgeContent={mounted && user ? pendingTrades : 0} color="error">
-                      <Box sx={{ pr: pendingTrades > 0 ? 1.5 : 0 }}>Trade</Box>
-                    </Badge>
-                  }
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={NextLink} href="/leaderboard" onClick={() => setMobileOpen(false)}>
-                <ListItemText primary="Leaderboard" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={NextLink} href="/plus" onClick={() => setMobileOpen(false)}>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                      <WorkspacePremiumIcon sx={{ fontSize: 18, color: "#f59e0b" }} />
-                      <Typography fontWeight={700} sx={{ color: "#f59e0b" }}>Plus</Typography>
-                    </Box>
-                  }
-                />
-              </ListItemButton>
-            </ListItem>
-            {mounted && user && (
-              <>
-                <Divider />
-                <ListItem disablePadding>
-                  <ListItemButton component={NextLink} href={`/user/${user.username}`} onClick={() => setMobileOpen(false)}>
-                    <ListItemText primary="My Inventory" />
-                  </ListItemButton>
-                </ListItem>
-                <ListItem disablePadding>
-                  <ListItemButton component={NextLink} href="/settings" onClick={() => setMobileOpen(false)}>
-                    <ListItemText primary="Settings" />
-                  </ListItemButton>
-                </ListItem>
-                {user.admin && (
-                  <ListItem disablePadding>
-                    <ListItemButton component={NextLink} href="/admin" onClick={() => setMobileOpen(false)}>
-                      <ListItemText primary="Admin Panel" />
-                    </ListItemButton>
-                  </ListItem>
+                {/* Mobile search */}
+                <div className="px-3 py-3 border-b border-border/40">
+                  <SearchBar onNavigate={() => setMobileOpen(false)} />
+                </div>
+
+                <nav className="flex flex-col py-1">
+                  {NAV_LINKS.map(({ href, label, icon: Icon }) => {
+                    const active = isActive(href)
+                    return (
+                      <NextLink
+                        key={href}
+                        href={href}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${
+                          active ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5"><Icon size={15} />{label}</span>
+                        {label === "Trade" && mounted && user && pendingTrades > 0 && (
+                          <span className="min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-1">
+                            {pendingTrades}
+                          </span>
+                        )}
+                      </NextLink>
+                    )
+                  })}
+                  <NextLink href="/plus" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-amber-400 hover:bg-amber-500/10 transition-colors">
+                    <Crown size={15} /> Plus
+                  </NextLink>
+                </nav>
+
+                {mounted && user && (
+                  <>
+                    <Separator className="bg-border/40" />
+                    <nav className="flex flex-col py-1">
+                      <NextLink href={`/user/${user.username}`} onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <User size={15} /> My Inventory
+                      </NextLink>
+                      <NextLink href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <Settings size={15} /> Settings
+                      </NextLink>
+                      {user.admin && (
+                        <NextLink href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                          <ShieldCheck size={15} /> Admin Panel
+                        </NextLink>
+                      )}
+                      <button onClick={() => { setMobileOpen(false); handleLogout() }} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-muted transition-colors text-left">
+                        <LogOut size={15} /> Logout
+                      </button>
+                    </nav>
+                  </>
                 )}
-                <ListItem disablePadding>
-                  <ListItemButton onClick={() => { setMobileOpen(false); handleLogout() }}>
-                    <ListItemText primary="Logout" sx={{ color: "error.main" }} />
-                  </ListItemButton>
-                </ListItem>
-              </>
-            )}
-          </List>
-        </Box>
-      </Drawer>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+      </header>
 
-      {mounted && (
-        <DepositWithdrawModal open={depositOpen} onClose={() => setDepositOpen(false)} />
-      )}
+      {mounted && <DepositWithdrawModal open={depositOpen} onClose={() => setDepositOpen(false)} />}
     </>
   )
 }

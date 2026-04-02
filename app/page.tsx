@@ -1,269 +1,176 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import NextLink from "next/link"
+import NextLink from "next/link";
 import {
-  Container, Box, Typography, Button, Grid, Card, CardContent,
-  CardMedia, Chip, CircularProgress, Divider, Stack, Tooltip,
-} from "@mui/material"
-import LockIcon from "@mui/icons-material/Lock"
-import InventoryIcon from "@mui/icons-material/Inventory"
-import StorefrontIcon from "@mui/icons-material/Storefront"
-import { useAuth } from "@/lib/auth-context"
-import type { Item, Rarity, Listing } from "@/lib/types"
-import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
+  Package,
+  Store,
+  ArrowRight,
+  Zap,
+  Shield,
+  Trophy,
+  Star,
+  ChevronRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+
+const RARITIES = [
+  { name: "Common", color: "#9e9e9e" },
+  { name: "Uncommon", color: "#43a047" },
+  { name: "Rare", color: "#1e88e5" },
+  { name: "Legendary", color: "#8e24aa" },
+  { name: "Omega", color: "#f4511e" },
+];
 
 export default function HomePage() {
-  const { user } = useAuth()
-  const [items, setItems] = useState<Item[]>([])
-  const [listings, setListings] = useState<Listing[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/items").then((r) => r.json()),
-      fetch("/api/listings?sortBy=created_at").then((r) => r.json()),
-    ]).then(([itemData, listingData]) => {
-      setItems(Array.isArray(itemData) ? itemData.slice(0, 8) : [])
-      setListings(Array.isArray(listingData) ? listingData.slice(0, 6) : [])
-      setLoading(false)
-    })
-  }, [])
+  const { user } = useAuth();
 
   return (
-    <Box>
-      {/* Hero */}
-      <Box
-        sx={{
-          background: "linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%)",
-          borderBottom: "1px solid #e3f2fd",
-          py: { xs: 6, md: 10 },
-          textAlign: "center",
-          px: 2,
-        }}
-      >
-        <Box
-          component="img"
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
-          alt="OmegaCases"
-          sx={{ width: { xs: 80, md: 120 }, height: { xs: 80, md: 120 }, mb: 2 }}
-        />
-        <Typography variant="h3" fontWeight={800} sx={{ mb: 1, fontSize: { xs: "2rem", md: "3rem" } }}>
-          OmegaCases
-        </Typography>
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 4, maxWidth: 500, mx: "auto" }}>
-          Open cases, win rare items, trade on the marketplace.
-        </Typography>
+    <div className="flex flex-col">
+      {/* ── Hero ──────────────────────────────────────────── */}
+      <section className="relative overflow-hidden px-4 py-20 md:py-32 text-center">
+        {/* Background glow blobs */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-primary/10 blur-[120px]" />
+          <div className="absolute bottom-0 left-1/4 w-[300px] h-[300px] rounded-full bg-purple-500/8 blur-[100px]" />
+          <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] rounded-full bg-rose-500/8 blur-[100px]" />
+        </div>
 
-        {user ? (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-            <Button
-              variant="contained"
-              size="large"
-              component={NextLink}
-              href="/open"
-              startIcon={<InventoryIcon />}
-              sx={{ px: 4, py: 1.5, fontSize: "1rem" }}
-            >
-              Open Cases
-            </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              component={NextLink}
-              href="/marketplace"
-              startIcon={<StorefrontIcon />}
-              sx={{ px: 4, py: 1.5, fontSize: "1rem" }}
-            >
-              Marketplace
-            </Button>
-          </Stack>
-        ) : (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-            <Button
-              variant="contained"
-              size="large"
-              component={NextLink}
-              href="/login"
-              startIcon={<LockIcon />}
-              sx={{ px: 4, py: 1.5, fontSize: "1rem" }}
-            >
-              Login to Play
-            </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              component={NextLink}
-              href="/register"
-              sx={{ px: 4, py: 1.5, fontSize: "1rem" }}
-            >
-              Create Account
-            </Button>
-          </Stack>
-        )}
-      </Box>
+        <div className="relative max-w-3xl mx-auto">
+          {/* Version badge */}
 
-      <Container maxWidth="xl" sx={{ py: 6 }}>
-        {/* Featured items */}
-        <Typography variant="h5" fontWeight={700} gutterBottom>
-          Featured Items
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        {loading ? (
-          <Box textAlign="center" py={4}><CircularProgress /></Box>
-        ) : (
-          <Grid container spacing={2} sx={{ mb: 6 }}>
-            {items.map((item) => {
-              const color = RARITY_COLORS[item.rarity as Rarity]
-              const glow = RARITY_GLOW[item.rarity as Rarity]
-              return (
-                <Grid item key={item.id} xs={6} sm={4} md={3} lg={2}>
-                  <Card
-                    sx={{
-                      border: `2px solid ${color}44`,
-                      boxShadow: glow,
-                      "&:hover": { transform: "translateY(-3px)", transition: "0.15s" },
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      image={item.image_url}
-                      alt={item.name}
-                      sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                    />
-                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                      <Chip
-                        label={item.rarity}
-                        size="small"
-                        sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }}
-                      />
-                      <Tooltip title={item.name} placement="top" arrow>
-                        <Typography
-                          variant="caption"
-                          display="block"
-                          fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        >
-                          {item.name}
-                        </Typography>
-                      </Tooltip>
-                      <Typography variant="caption" color="primary.main" fontWeight={700}>
-                        ${Number(item.market_price).toFixed(2)}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )
-            })}
-          </Grid>
-        )}
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/omegacrate_logo-tJzRwAfwpZAQEkJOSjQGI93l5hRU06.png"
+            alt="OmegaCases"
+            className="w-20 h-20 md:w-28 md:h-28 mx-auto mb-5 drop-shadow-xl"
+          />
 
-        {/* Marketplace preview */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-          <Typography variant="h5" fontWeight={700}>Marketplace</Typography>
-          <Button component={NextLink} href="/marketplace" variant="outlined" size="small">
-            View All
-          </Button>
-        </Box>
-        <Divider sx={{ mb: 3 }} />
-        {!user && (
-          <Box
-            sx={{
-              position: "relative",
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                backdropFilter: "blur(4px)",
-                bgcolor: "rgba(255,255,255,0.7)",
-                zIndex: 2,
-                borderRadius: 2,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              },
-            }}
-          >
-            <Grid container spacing={2} sx={{ opacity: 0.4, pointerEvents: "none" }}>
-              {(loading ? Array(6).fill(null) : listings).map((listing, i) => (
-                <Grid item key={i} xs={6} sm={4} md={2}>
-                  <Card sx={{ height: 180 }}>
-                    {listing && listing.items && (
-                      <>
-                        <CardMedia
-                          component="img"
-                          image={listing.items.image_url}
-                          alt={listing.items.name}
-                          sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                        />
-                        <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                          <Typography variant="caption" fontWeight={700}>${Number(listing.price).toFixed(2)}</Typography>
-                        </CardContent>
-                      </>
-                    )}
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-            <Box
-              sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%,-50%)",
-                zIndex: 3,
-                textAlign: "center",
-              }}
-            >
-              <LockIcon sx={{ fontSize: 48, color: "primary.main", mb: 1 }} />
-              <Typography variant="h6" fontWeight={700}>Login to browse the marketplace</Typography>
-              <Button variant="contained" component={NextLink} href="/login" sx={{ mt: 2 }}>
-                Login
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 leading-tight tracking-tight">
+            OmegaCases.
+            <br />
+            <span className="text-primary">Trade. Profit. Repeat.</span>
+          </h1>
+
+          <p className="text-base md:text-lg text-muted-foreground mb-8 max-w-xl mx-auto leading-relaxed">
+            OmegaCases is a case-opening website where you try your luck, open
+            cases, and trade them between players.
+          </p>
+
+          {user ? (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                size="lg"
+                className="gap-2 px-8 text-base font-bold shadow-lg shadow-primary/25"
+                asChild
+              >
+                <NextLink href="/open">
+                  <Package size={18} /> Open Cases Now
+                </NextLink>
               </Button>
-            </Box>
-          </Box>
-        )}
-        {user && (
-          <Grid container spacing={2}>
-            {listings.map((listing) => {
-              if (!listing?.items) return null
-              const color = RARITY_COLORS[listing.items.rarity as Rarity]
-              return (
-                <Grid item key={listing.id} xs={6} sm={4} md={2}>
-                  <Card
-                    component={NextLink}
-                    href="/marketplace"
-                    sx={{
-                      textDecoration: "none",
-                      border: `1px solid ${color}33`,
-                      "&:hover": { boxShadow: `0 4px 16px ${color}44`, transform: "translateY(-2px)", transition: "0.15s" },
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      image={listing.items.image_url}
-                      alt={listing.items.name}
-                      sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }}
-                    />
-                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                      <Chip label={listing.items.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                      <Tooltip title={listing.items.name} placement="top" arrow>
-                        <Typography variant="caption" display="block" fontWeight={600}
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {listing.items.name}
-                        </Typography>
-                      </Tooltip>
-                      <Typography variant="caption" color="primary.main" fontWeight={700}>
-                        ${Number(listing.price).toFixed(2)}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )
-            })}
-          </Grid>
-        )}
-      </Container>
-    </Box>
-  )
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 px-8 text-base"
+                asChild
+              >
+                <NextLink href="/marketplace">
+                  <Store size={18} /> Browse Marketplace
+                </NextLink>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                size="lg"
+                className="gap-2 px-8 text-base font-bold shadow-lg shadow-primary/25"
+                asChild
+              >
+                <NextLink href="/register">
+                  Start Opening 🤑🫰 <ArrowRight size={16} />
+                </NextLink>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 px-8 text-base"
+                asChild
+              >
+                <NextLink href="/login">Login</NextLink>
+              </Button>
+            </div>
+          )}
+
+          {/* Crypto logos + instant payouts */}
+          <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
+            <span className="text-xs text-muted-foreground/70 font-medium">Supports:</span>
+            {[
+              { src: "/bitcoinbtclogo.png",       alt: "Bitcoin (BTC)"      },
+              { src: "/litecoin-ltc-logo.png",    alt: "Litecoin (LTC)"     },
+              { src: "/solana-sol-logo.png",       alt: "Solana (SOL)"       },
+              { src: "/bitcoin-cash-bch-logo.png", alt: "Bitcoin Cash (BCH)" },
+            ].map((c) => (
+              <img
+                key={c.src}
+                src={c.src}
+                alt={c.alt}
+                title={c.alt}
+                className="w-6 h-6 object-contain"
+              />
+            ))}
+            <span className="text-muted-foreground/50 text-xs">·</span>
+            <span className="text-xs text-muted-foreground/70 font-medium">Instant payouts</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Rarity strip ─────────────────────────────────── */}
+      <div className="border-y border-border/40 py-3 overflow-x-auto">
+        <div className="flex items-center justify-center gap-3 min-w-max px-4">
+          {RARITIES.map((r) => (
+            <div key={r.name} className="flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: r.color }}
+              />
+              <span className="text-xs font-semibold text-muted-foreground">
+                {r.name}
+              </span>
+            </div>
+          ))}
+          <span className="text-muted-foreground/30 text-xs mx-1">|</span>
+          <span className="text-xs text-muted-foreground/70 font-medium">
+            5 item rarity tiers · provably fair case opening site
+          </span>
+        </div>
+      </div>
+
+      {/* ── CTA strip ────────────────────────────────────── */}
+      {!user && (
+        <section className="border-t border-border/40 bg-card/30">
+          <div className="max-w-2xl mx-auto px-4 py-14 text-center">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">
+              👇🤑 Start Opening Cases boss.. 👇🤑
+            </h2>
+            <p className="text-muted-foreground mb-6 text-sm md:text-base">
+              Create a free account right now. No email required.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                size="lg"
+                className="gap-2 font-bold shadow-lg shadow-primary/20"
+                asChild
+              >
+                <NextLink href="/register">
+                  Create Account <ChevronRight size={16} />
+                </NextLink>
+              </Button>
+              <Button size="lg" variant="ghost" asChild>
+                <NextLink href="/leaderboard">View Leaderboard</NextLink>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
 }

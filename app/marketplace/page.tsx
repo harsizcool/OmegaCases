@@ -1,21 +1,20 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import {
-  Container, Grid, Box, Typography, Card, CardContent, CardMedia,
-  Chip, TextField, Select, MenuItem, FormControl, InputLabel,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Alert, Drawer, List, ListItemButton, ListItemAvatar,
-  Avatar, ListItemText, Divider, Checkbox, FormControlLabel, Tooltip, Slider,
-} from "@mui/material"
-import FilterListIcon from "@mui/icons-material/FilterList"
-import AddIcon from "@mui/icons-material/Add"
-import ArrowBackIcon from "@mui/icons-material/ArrowBack"
-import AccessTimeIcon from "@mui/icons-material/AccessTime"
+import NextLink from "next/link"
+import { Filter, Plus, ArrowLeft, Clock, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
 import type { Listing, Rarity, InventoryItem } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
-import NextLink from "next/link"
 import { useRouter } from "next/navigation"
 import FilterPanel from "@/components/marketplace-filter-panel"
 
@@ -31,11 +30,6 @@ const RARITY_PRICE_CAPS: Record<string, number> = {
   Omega: MAX_LISTING_PRICE,
 }
 
-// --- Persist helpers ---
-function loadFilters() {
-  if (typeof window === "undefined") return null
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") } catch { return null }
-}
 function saveFilters(f: object) {
   if (typeof window === "undefined") return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(f))
@@ -63,13 +57,11 @@ export default function MarketplacePage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
-  // Hydrate filters from localStorage on client only — avoids SSR mismatch
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")
       if (saved) {
         if (saved.search !== undefined) setSearch(saved.search)
-        // Only restore rarities if explicitly saved (not first visit)
         if (Array.isArray(saved.rarities)) setRarities(saved.rarities)
         if (saved.minPrice !== undefined) setMinPrice(saved.minPrice)
         if (saved.maxPrice !== undefined) setMaxPrice(saved.maxPrice)
@@ -78,12 +70,10 @@ export default function MarketplacePage() {
         if (saved.ignoreOwn != null) setIgnoreOwn(saved.ignoreOwn)
         if (saved.showSold != null) setShowSold(saved.showSold)
       }
-      // If no saved state, defaults (sort by price, no filters) already set above
     } catch {}
     setHydrated(true)
   }, [])
 
-  // Persist filters on any change
   useEffect(() => {
     saveFilters({ search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold })
   }, [search, rarities, minPrice, maxPrice, sellerSearch, sortBy, ignoreOwn, showSold])
@@ -92,7 +82,6 @@ export default function MarketplacePage() {
   const [sellOpen, setSellOpen] = useState(false)
   const [myInventory, setMyInventory] = useState<InventoryItem[]>([])
   const [myInventoryLoading, setMyInventoryLoading] = useState(false)
-  // Step 1: show unique items; Step 2: show copies of selected unique item
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [sellItem, setSellItem] = useState<InventoryItem | null>(null)
   const [selectedCopies, setSelectedCopies] = useState<InventoryItem[]>([])
@@ -127,7 +116,6 @@ export default function MarketplacePage() {
     else setLoadingMore(false)
   }, [rarities, minPrice, maxPrice, sortBy, search, sellerSearch, ignoreOwn, showSold, user?.id])
 
-  // Reset to page 0 and replace listings whenever filters change
   const prevFiltersRef = useRef({ rarities, minPrice, maxPrice, search, sellerSearch, sortBy, ignoreOwn, showSold })
   useEffect(() => {
     const prev = prevFiltersRef.current
@@ -150,7 +138,6 @@ export default function MarketplacePage() {
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current) }
   }, [fetchListings, hydrated])
 
-  // IntersectionObserver sentinel for infinite scroll
   useEffect(() => {
     if (!sentinelRef.current) return
     const observer = new IntersectionObserver(
@@ -171,7 +158,6 @@ export default function MarketplacePage() {
     if (!user) return
     setMyInventoryLoading(true)
     try {
-      // Fetch all active listings to exclude already-listed items
       const allListingsRes = await fetch("/api/listings?limit=10000")
       const allListings: Listing[] = await allListingsRes.json()
       const listedInvIds = new Set(
@@ -179,19 +165,16 @@ export default function MarketplacePage() {
           ? allListings.filter((l) => l.seller_id === user.id).map((l) => l.inventory_id)
           : []
       )
-
-      // Paginate through all inventory pages (API returns 1000 per page)
       let allInv: InventoryItem[] = []
-      let page = 0
+      let pg = 0
       while (true) {
-        const res = await fetch(`/api/inventory/${user.id}?page=${page}`)
+        const res = await fetch(`/api/inventory/${user.id}?page=${pg}`)
         const data = await res.json()
         const batch: InventoryItem[] = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []
         allInv = allInv.concat(batch)
         if (batch.length < 1000) break
-        page++
+        pg++
       }
-
       const available = allInv.filter((inv) => !listedInvIds.has(inv.id))
       setMyInventory(available)
       setSellItem((prev) => prev ? (available.find((i) => i.id === prev.id) ?? null) : null)
@@ -218,7 +201,6 @@ export default function MarketplacePage() {
     setSellError("")
     try {
       if (bulkMode && selectedCopies.length > 1) {
-        // Bulk list: random price in range for each copy
         const [minP, maxP] = bulkPriceRange
         const results = await Promise.all(selectedCopies.map((inv) => {
           const randomPrice = Math.round((minP + Math.random() * (maxP - minP)) * 100) / 100
@@ -254,7 +236,7 @@ export default function MarketplacePage() {
     }
   }
 
-  // Group inventory by item_id for the two-step picker
+  // Group inventory by item_id
   const groupedInventory: { item_id: string; name: string; rarity: string; image_url: string; market_price: number; copies: InventoryItem[] }[] = []
   const seenItemIds = new Set<string>()
   for (const inv of myInventory) {
@@ -286,271 +268,286 @@ export default function MarketplacePage() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>Marketplace</Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button startIcon={<FilterListIcon />} variant="outlined" onClick={() => setFilterOpen(true)} sx={{ display: { md: "none" } }}>
-            Filter
+    <div className="max-w-[1400px] mx-auto px-4 py-6">
+      <div className="flex justify-between items-center mb-5 flex-wrap gap-2">
+        <h1 className="text-2xl font-bold">Marketplace</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2 md:hidden" onClick={() => setFilterOpen(true)}>
+            <Filter size={15} /> Filter
           </Button>
           {user && (
-            <Button startIcon={<AddIcon />} variant="contained" onClick={openSellDialog}>List Item</Button>
+            <Button className="gap-2" onClick={openSellDialog}>
+              <Plus size={15} /> List Item
+            </Button>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Login wall — blur content for guests */}
-      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        <Box sx={{ display: { xs: "none", md: "block" } }}>
-            {hydrated && <FilterPanel {...filterProps} />}
-        </Box>
-        <Box sx={{ flex: 1, position: "relative", minHeight: 300 }}>
+      <div className="flex gap-6 items-start">
+        <div className="hidden md:block">
+          {hydrated && <FilterPanel {...filterProps} />}
+        </div>
+
+        <div className="flex-1 relative min-h-[300px]">
           {!user && (
-            <Box sx={{
-              position: "absolute", inset: 0, zIndex: 10,
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              gap: 2, backdropFilter: "blur(8px)", bgcolor: "rgba(255,255,255,0.6)", borderRadius: 2,
-              minHeight: 300,
-            }}>
-              <Typography variant="h6" fontWeight={700}>Sign in to browse the Marketplace</Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button variant="contained" component={NextLink} href="/login">Log In</Button>
-                <Button variant="outlined" component={NextLink} href="/register">Register</Button>
-              </Box>
-            </Box>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 backdrop-blur-sm bg-background/60 rounded-xl min-h-[300px]">
+              <p className="text-lg font-bold">Sign in to browse the Marketplace</p>
+              <div className="flex gap-2">
+                <Button asChild><NextLink href="/login">Log In</NextLink></Button>
+                <Button variant="outline" asChild><NextLink href="/register">Register</NextLink></Button>
+              </div>
+            </div>
           )}
+
           {loading ? (
-            <Box textAlign="center" py={8}><CircularProgress /></Box>
+            <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-muted-foreground" /></div>
           ) : listings.length === 0 ? (
-            <Box textAlign="center" py={8}><Typography color="text.secondary">No listings found</Typography></Box>
+            <div className="text-center py-16 text-muted-foreground">No listings found</div>
           ) : (
             <>
-              <Grid container spacing={2}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {listings.map((listing) => {
                   const item = listing.items
                   if (!item) return null
                   const color = RARITY_COLORS[item.rarity as Rarity]
                   return (
-                    <Grid item key={listing.id} xs={6} sm={4} md={3} lg={2}>
-                      <Card
-                        component={NextLink}
-                        href={`/listing/${listing.id}`}
-                        sx={{
-                          cursor: "pointer", textDecoration: "none", display: "block",
-                          border: `1px solid ${color}33`,
-                          "&:hover": { boxShadow: `0 4px 20px ${color}44`, transform: "translateY(-2px)", transition: "all 0.15s" },
-                        }}
-                      >
-                        <Box sx={{ position: "relative" }}>
-                          <CardMedia component="img" image={item.image_url} alt={item.name}
-                            sx={{ height: 120, objectFit: "contain", p: 1, bgcolor: "#f8fbff" }} />
-                          {item.limited_time && (
-                            <Tooltip title="Limited time — not available in cases" placement="top" arrow>
-                              <Box sx={{
-                                position: "absolute", top: 6, right: 6,
-                                bgcolor: "rgba(0,0,0,0.6)", borderRadius: "50%",
-                                width: 20, height: 20,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}>
-                                <AccessTimeIcon sx={{ fontSize: 13, color: "#ffd54f" }} />
-                              </Box>
+                    <NextLink
+                      key={listing.id}
+                      href={`/listing/${listing.id}`}
+                      className="border rounded-xl overflow-hidden hover:-translate-y-0.5 transition-all block"
+                      style={{ borderColor: `${color}33` }}
+                    >
+                      <div className="relative">
+                        <img src={item.image_url} alt={item.name} className="w-full h-[110px] object-contain p-2 bg-muted" />
+                        {item.limited_time && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center">
+                                  <Clock size={11} className="text-yellow-300" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Limited time — not available in cases</TooltipContent>
                             </Tooltip>
-                          )}
-                        </Box>
-                        <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                          <Chip label={item.rarity} size="small" sx={{ bgcolor: color, color: "#fff", mb: 0.5, fontSize: "0.6rem" }} />
-                          <Tooltip title={item.name} placement="top" arrow>
-                            <Typography variant="caption" display="block" fontWeight={600}
-                              sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.primary" }}>
-                              {item.name}
-                            </Typography>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full text-white mb-1 inline-block" style={{ backgroundColor: color }}>{item.rarity}</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="text-xs font-semibold truncate text-foreground">{item.name}</p>
+                            </TooltipTrigger>
+                            <TooltipContent>{item.name}</TooltipContent>
                           </Tooltip>
-                          <Typography variant="body2" fontWeight={700} color={listing.status === "sold" ? "text.disabled" : "primary.main"}>
-                            ${Number(listing.price).toFixed(2)}
-                            {listing.status === "sold" && <Chip label="SOLD" size="small" sx={{ ml: 0.5, fontSize: "0.55rem", height: 16 }} color="default" />}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            by {listing.users?.username || "—"}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
+                        </TooltipProvider>
+                        <p className={`text-sm font-bold ${listing.status === "sold" ? "text-muted-foreground" : "text-primary"}`}>
+                          ${Number(listing.price).toFixed(2)}
+                          {listing.status === "sold" && <span className="ml-1 text-[0.55rem] font-bold bg-muted text-muted-foreground rounded px-1 py-0.5">SOLD</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">by {listing.users?.username || "—"}</p>
+                      </div>
+                    </NextLink>
                   )
                 })}
-              </Grid>
-              {/* Infinite scroll sentinel */}
-              <Box ref={sentinelRef} sx={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", mt: 2 }}>
-                {loadingMore && <CircularProgress size={24} />}
+              </div>
+
+              <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
+                {loadingMore && <Loader2 size={24} className="animate-spin text-muted-foreground" />}
                 {!hasMore && listings.length > 0 && (
-                  <Typography variant="caption" color="text.secondary">All {totalListings} listings loaded</Typography>
+                  <p className="text-xs text-muted-foreground">All {totalListings} listings loaded</p>
                 )}
-              </Box>
+              </div>
             </>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {/* Mobile filter drawer */}
-      <Drawer anchor="left" open={filterOpen} onClose={() => setFilterOpen(false)}>
-        <Box sx={{ p: 2, width: 280 }}>{hydrated && <FilterPanel {...filterProps} />}</Box>
-      </Drawer>
+      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+        <SheetContent side="left" className="p-4 w-72">
+          {hydrated && <FilterPanel {...filterProps} />}
+        </SheetContent>
+      </Sheet>
 
       {/* Sell dialog — two-step */}
-      <Dialog open={sellOpen} onClose={() => setSellOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {selectedItemId && !sellSuccess && (
-            <Button size="small" startIcon={<ArrowBackIcon />}
-              onClick={() => { setSelectedItemId(null); setSellItem(null); setSellPrice(""); setSelectedCopies([]); setBulkMode(false) }}
-              sx={{ mr: 1 }}>
-              Back
-            </Button>
-          )}
-          {!selectedItemId ? "List Item for Sale" : selectedGroup ? `${selectedGroup.name} — Pick a Copy` : "List Item for Sale"}
-        </DialogTitle>
-        <DialogContent>
-          {sellSuccess ? (
-            <Alert severity="success" sx={{ mt: 1 }}>Listed successfully!</Alert>
-          ) : myInventoryLoading ? (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 4, justifyContent: "center" }}>
-              <CircularProgress size={24} />
-              <Typography color="text.secondary">Loading your inventory…</Typography>
-            </Box>
-          ) : myInventory.length === 0 ? (
-            <Typography color="text.secondary" sx={{ mt: 1 }}>No items available to list.</Typography>
-          ) : !selectedItemId ? (
-            // Step 1: unique items
-            <List dense disablePadding>
-              {groupedInventory.map((group, idx) => {
-                const color = RARITY_COLORS[group.rarity as Rarity]
-                return (
-                  <Box key={group.item_id}>
-                    {idx > 0 && <Divider />}
-                    <ListItemButton onClick={() => setSelectedItemId(group.item_id)} sx={{ borderRadius: 1 }}>
-                      <ListItemAvatar>
-                        <Avatar src={group.image_url} alt={group.name} variant="rounded"
-                          sx={{ width: 44, height: 44, bgcolor: "#f8fbff", border: `2px solid ${color}44` }} />
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Typography variant="body2" fontWeight={600}>{group.name}</Typography>
-                            <Chip label={group.rarity} size="small" sx={{ bgcolor: color, color: "#fff", fontSize: "0.6rem" }} />
-                            {group.copies.length > 1 && (
-                              <Chip label={`x${group.copies.length}`} size="small" variant="outlined" sx={{ fontSize: "0.6rem" }} />
-                            )}
-                          </Box>
-                        }
-                        secondary={`$${group.market_price.toFixed(2)} market price`}
-                      />
-                    </ListItemButton>
-                  </Box>
-                )
-              })}
-            </List>
-          ) : (
-            // Step 2: copies + price input
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-              {selectedGroup && selectedGroup.copies.length > 1 && (
-                <>
-                  <Typography variant="body2" color="text.secondary">
-                    You own <strong>{selectedGroup.copies.length}</strong> copies. Select which to list:
-                  </Typography>
-                  <List dense disablePadding>
-                    {selectedGroup.copies.map((inv, idx) => {
-                      const checked = selectedCopies.some((c) => c.id === inv.id)
-                      return (
-                        <Box key={inv.id}>
-                          {idx > 0 && <Divider />}
-                          <ListItemButton
-                            onClick={() => {
-                              setSelectedCopies((prev) =>
-                                checked ? prev.filter((c) => c.id !== inv.id) : [...prev, inv]
-                              )
-                              if (!checked && selectedCopies.length === 0) setSellItem(inv)
-                            }}
-                            sx={{ borderRadius: 1 }}
-                          >
-                            <Checkbox checked={checked} size="small" sx={{ mr: 1, p: 0 }} />
-                            <ListItemText primary={`Copy #${idx + 1}`} secondary={`ID: ${inv.id.slice(0, 8)}…`} />
-                          </ListItemButton>
-                        </Box>
-                      )
-                    })}
-                  </List>
-                  {selectedCopies.length > 0 && (
-                    <FormControlLabel
-                      control={<Checkbox checked={bulkMode} onChange={(e) => { setBulkMode(e.target.checked); setSellItem(selectedCopies[0] ?? null) }} size="small" />}
-                      label={<Typography variant="body2">Bulk list with random prices</Typography>}
-                    />
-                  )}
-                  {bulkMode && selectedCopies.length > 1 && (() => {
-                    const rarity = selectedGroup.rarity
-                    const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
-                    return (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Random price range: ${bulkPriceRange[0].toFixed(2)} – ${bulkPriceRange[1].toFixed(2)} (max ${cap.toFixed(2)} for {rarity})
-                        </Typography>
-                        <Slider
-                          value={bulkPriceRange}
-                          onChange={(_, v) => setBulkPriceRange(v as [number, number])}
-                          min={0.01} max={cap} step={0.01}
-                          sx={{ mt: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          Will list <strong>{selectedCopies.length}</strong> copies at randomized prices in this range.
-                        </Typography>
-                      </Box>
-                    )
-                  })()}
-                </>
+      <Dialog open={sellOpen} onOpenChange={(v) => !v && setSellOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedItemId && !sellSuccess && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 h-7 px-2"
+                  onClick={() => { setSelectedItemId(null); setSellItem(null); setSellPrice(""); setSelectedCopies([]); setBulkMode(false) }}
+                >
+                  <ArrowLeft size={14} /> Back
+                </Button>
               )}
-              {/* Auto-select if only one copy */}
-              {selectedGroup && selectedGroup.copies.length === 1 && !sellItem && (() => {
-                const only = selectedGroup.copies[0]
-                if (!sellItem) { setSellItem(only); setSellPrice(String(selectedGroup.market_price)) }
-                return null
-              })()}
-              {/* Single item price input */}
-              {!bulkMode && (sellItem || (selectedCopies.length === 1)) && (() => {
-                const item = sellItem || selectedCopies[0]
-                if (!item) return null
-                if (!sellItem) setSellItem(item)
-                const rarity = item.items?.rarity ?? "Omega"
-                const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
-                return (
-                  <TextField
-                    label={`Your Price (USD, max $${cap.toFixed(2)} for ${rarity})`}
-                    type="number"
-                    value={sellPrice}
-                    onChange={(e) => setSellPrice(e.target.value)}
-                    inputProps={{ min: 0.01, max: cap, step: 0.01 }}
-                    fullWidth
-                    autoFocus
-                  />
-                )
-              })()}
-              {sellError && <Alert severity="error">{sellError}</Alert>}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSellOpen(false)}>Close</Button>
-          {(sellItem || (bulkMode && selectedCopies.length > 1)) && !sellSuccess && (
-            <Button
-              variant="contained"
-              onClick={handleSell}
-              disabled={sellLoading || (!bulkMode && !sellPrice)}
-            >
-              {sellLoading
-                ? "Listing..."
-                : bulkMode && selectedCopies.length > 1
+              {!selectedItemId ? "List Item for Sale" : selectedGroup ? `${selectedGroup.name} — Pick a Copy` : "List Item for Sale"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-1">
+            {sellSuccess ? (
+              <Alert><AlertDescription className="text-green-600">Listed successfully!</AlertDescription></Alert>
+            ) : myInventoryLoading ? (
+              <div className="flex items-center gap-3 py-8 justify-center">
+                <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading your inventory…</p>
+              </div>
+            ) : myInventory.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No items available to list.</p>
+            ) : !selectedItemId ? (
+              // Step 1: unique items
+              <div className="flex flex-col divide-y divide-border">
+                {groupedInventory.map((group) => {
+                  const color = RARITY_COLORS[group.rarity as Rarity]
+                  return (
+                    <button
+                      key={group.item_id}
+                      onClick={() => setSelectedItemId(group.item_id)}
+                      className="flex items-center gap-3 py-2.5 hover:bg-muted/50 rounded-lg px-1 transition-colors text-left"
+                    >
+                      <img
+                        src={group.image_url}
+                        alt={group.name}
+                        className="w-11 h-11 object-contain rounded-lg border-2"
+                        style={{ borderColor: `${color}44`, backgroundColor: "#f8fbff" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-semibold truncate">{group.name}</p>
+                          <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>{group.rarity}</span>
+                          {group.copies.length > 1 && (
+                            <span className="text-[0.6rem] font-bold border border-border rounded-full px-1.5 py-0.5">x{group.copies.length}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">${group.market_price.toFixed(2)} market price</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              // Step 2: copies + price
+              <div className="flex flex-col gap-3">
+                {selectedGroup && selectedGroup.copies.length > 1 && (
+                  <>
+                    <p className="text-sm text-muted-foreground">You own <strong>{selectedGroup.copies.length}</strong> copies. Select which to list:</p>
+                    <div className="flex flex-col divide-y divide-border">
+                      {selectedGroup.copies.map((inv, idx) => {
+                        const checked = selectedCopies.some((c) => c.id === inv.id)
+                        return (
+                          <label key={inv.id} className="flex items-center gap-3 py-2 cursor-pointer">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) => {
+                                setSelectedCopies((prev) =>
+                                  v ? [...prev, inv] : prev.filter((c) => c.id !== inv.id)
+                                )
+                                if (v && selectedCopies.length === 0) setSellItem(inv)
+                              }}
+                            />
+                            <div>
+                              <p className="text-sm font-medium">Copy #{idx + 1}</p>
+                              <p className="text-xs text-muted-foreground">ID: {inv.id.slice(0, 8)}…</p>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {selectedCopies.length > 0 && (
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <Checkbox
+                          checked={bulkMode}
+                          onCheckedChange={(v) => { setBulkMode(Boolean(v)); setSellItem(selectedCopies[0] ?? null) }}
+                        />
+                        Bulk list with random prices
+                      </label>
+                    )}
+                    {bulkMode && selectedCopies.length > 1 && (() => {
+                      const cap = RARITY_PRICE_CAPS[selectedGroup.rarity] ?? MAX_LISTING_PRICE
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            Random price range: ${bulkPriceRange[0].toFixed(2)} – ${bulkPriceRange[1].toFixed(2)} (max ${cap.toFixed(2)} for {selectedGroup.rarity})
+                          </p>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <Label className="text-xs">Min price</Label>
+                              <Input
+                                type="number"
+                                value={bulkPriceRange[0]}
+                                onChange={(e) => setBulkPriceRange([parseFloat(e.target.value) || 0.01, bulkPriceRange[1]])}
+                                min={0.01} max={bulkPriceRange[1]} step={0.01}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <Label className="text-xs">Max price</Label>
+                              <Input
+                                type="number"
+                                value={bulkPriceRange[1]}
+                                onChange={(e) => setBulkPriceRange([bulkPriceRange[0], parseFloat(e.target.value) || 0.01])}
+                                min={bulkPriceRange[0]} max={cap} step={0.01}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Will list <strong>{selectedCopies.length}</strong> copies at randomized prices in this range.</p>
+                        </div>
+                      )
+                    })()}
+                  </>
+                )}
+                {/* Auto-select single copy */}
+                {selectedGroup && selectedGroup.copies.length === 1 && !sellItem && (() => {
+                  const only = selectedGroup.copies[0]
+                  if (!sellItem) { setSellItem(only); setSellPrice(String(selectedGroup.market_price)) }
+                  return null
+                })()}
+                {/* Single price input */}
+                {!bulkMode && (sellItem || selectedCopies.length === 1) && (() => {
+                  const item = sellItem || selectedCopies[0]
+                  if (!item) return null
+                  if (!sellItem) setSellItem(item)
+                  const rarity = item.items?.rarity ?? "Omega"
+                  const cap = RARITY_PRICE_CAPS[rarity] ?? MAX_LISTING_PRICE
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Your Price (max ${cap.toFixed(2)} for {rarity})</Label>
+                      <Input
+                        type="number"
+                        value={sellPrice}
+                        onChange={(e) => setSellPrice(e.target.value)}
+                        min={0.01} max={cap} step={0.01}
+                        autoFocus
+                      />
+                    </div>
+                  )
+                })()}
+                {sellError && <Alert variant="destructive"><AlertDescription>{sellError}</AlertDescription></Alert>}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSellOpen(false)}>Close</Button>
+            {(sellItem || (bulkMode && selectedCopies.length > 1)) && !sellSuccess && (
+              <Button onClick={handleSell} disabled={sellLoading || (!bulkMode && !sellPrice)}>
+                {sellLoading
+                  ? <><Loader2 size={14} className="animate-spin mr-1" />Listing...</>
+                  : bulkMode && selectedCopies.length > 1
                   ? `Bulk List ${selectedCopies.length} Items`
                   : "List"}
-            </Button>
-          )}
-        </DialogActions>
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
-    </Container>
+    </div>
   )
 }

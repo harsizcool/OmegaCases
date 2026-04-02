@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-  Container, Box, Typography, Card, CardContent, Avatar,
-  CircularProgress, Chip, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper,
-} from "@mui/material"
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"
+import { Loader2, Trophy } from "lucide-react"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import PlusBadge from "@/components/plus-badge"
 
 interface LeaderboardEntry {
@@ -34,79 +31,70 @@ export default function LeaderboardPage() {
     load()
   }, [])
 
-  const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"]
-
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <EmojiEventsIcon sx={{ fontSize: 56, color: "#FFD700" }} />
-        <Typography variant="h4" fontWeight={700}>
-          Leaderboard
-        </Typography>
-        <Typography color="text.secondary">Top 10 richest inventories by RAP</Typography>
-      </Box>
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <div className="text-center mb-8">
+        <Trophy size={48} className="mx-auto mb-2 text-yellow-400" />
+        <h1 className="text-3xl font-bold">Leaderboard</h1>
+        <p className="text-muted-foreground">Top 10 richest inventories by RAP</p>
+      </div>
 
       {loading ? (
-        <Box textAlign="center"><CircularProgress /></Box>
+        <div className="flex justify-center py-12">
+          <Loader2 size={32} className="animate-spin text-muted-foreground" />
+        </div>
       ) : (
-        <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e3f2fd" }}>
+        <div className="border border-border rounded-xl overflow-hidden">
           <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: "#e3f2fd" }}>
-                <TableCell align="center" sx={{ fontWeight: 700, width: 60 }}>#</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Player</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>Inventory RAP</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>Items</TableCell>
+            <TableHeader>
+              <TableRow className="bg-muted hover:bg-muted">
+                <TableHead className="w-14 text-center font-bold">#</TableHead>
+                <TableHead className="font-bold">Player</TableHead>
+                <TableHead className="text-right font-bold">Inventory RAP</TableHead>
+                <TableHead className="text-right font-bold">Items</TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
               {entries.map((entry, i) => (
                 <TableRow
                   key={entry.id}
+                  className="cursor-pointer hover:bg-primary/5 transition-colors"
+                  style={{ backgroundColor: i < 3 ? `${["#FFD700", "#C0C0C0", "#CD7F32"][i]}11` : undefined }}
                   onClick={() => router.push(`/user/${entry.username}`)}
-                  sx={{
-                    textDecoration: "none",
-                    cursor: "pointer",
-                    "&:hover": { bgcolor: "#f0f7ff" },
-                    bgcolor: i < 3 ? `${medalColors[i]}11` : "inherit",
-                  }}
                 >
-                  <TableCell align="center">
+                  <TableCell className="text-center">
                     {i < 3 ? (
-                      <Typography fontSize={22}>
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
-                      </Typography>
+                      <span className="text-xl">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
                     ) : (
-                      <Typography fontWeight={700} color="text.secondary">{i + 1}</Typography>
+                      <span className="font-bold text-muted-foreground">{i + 1}</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      {entry.profile_picture ? (
-                        <Avatar src={entry.profile_picture} sx={{ width: 36, height: 36 }} />
-                      ) : (
-                        <Avatar sx={{ width: 36, height: 36, bgcolor: "primary.main", fontSize: 14 }}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="w-9 h-9">
+                        {entry.profile_picture && <AvatarImage src={entry.profile_picture} />}
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
                           {entry.username[0].toUpperCase()}
-                        </Avatar>
-                      )}
-                      <Typography fontWeight={600}>{entry.username}</Typography>
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-semibold">{entry.username}</span>
                       {entry.plus && <PlusBadge />}
-                    </Box>
+                    </div>
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography fontWeight={700} color="primary.main">
-                      ${entry.rap.toFixed(2)}
-                    </Typography>
+                  <TableCell className="text-right font-bold text-primary">
+                    ${entry.rap.toFixed(2)}
                   </TableCell>
-                  <TableCell align="right">
-                    <Chip label={entry.itemCount} size="small" color="primary" variant="outlined" />
+                  <TableCell className="text-right">
+                    <span className="text-sm font-semibold border border-primary text-primary rounded-full px-2 py-0.5">
+                      {entry.itemCount}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </div>
       )}
-    </Container>
+    </div>
   )
 }

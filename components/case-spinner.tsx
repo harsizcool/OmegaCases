@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Box, Typography, useMediaQuery, useTheme } from "@mui/material"
+import { useIsMobile } from "@/components/ui/use-mobile"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS, RARITY_GLOW } from "@/lib/types"
 
@@ -11,7 +11,6 @@ const TOTAL_ITEM = ITEM_WIDTH + ITEM_GAP
 const VISIBLE_ITEMS = 7
 const MAX_SPINNER_WIDTH = VISIBLE_ITEMS * TOTAL_ITEM - ITEM_GAP
 
-// Mobile reduced dimensions
 const ITEM_WIDTH_MOBILE = 90
 const ITEM_GAP_MOBILE = 6
 const TOTAL_ITEM_MOBILE = ITEM_WIDTH_MOBILE + ITEM_GAP_MOBILE
@@ -25,7 +24,7 @@ interface Props {
   targetItem: Item
   onComplete: () => void
   spinning: boolean
-  speed?: number  // 1 = normal, 2 = 2x
+  speed?: number
   muted?: boolean
 }
 
@@ -38,8 +37,7 @@ function playTick() {
 }
 
 export default function CaseSpinner({ items, targetItem, onComplete, spinning, speed = 1, muted = false }: Props) {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
+  const isMobile = useIsMobile()
 
   const itemW = isMobile ? ITEM_WIDTH_MOBILE : ITEM_WIDTH
   const itemGap = isMobile ? ITEM_GAP_MOBILE : ITEM_GAP
@@ -51,7 +49,6 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
   const animFrameRef = useRef<number>(0)
   const lastTickIndexRef = useRef<number>(-1)
 
-  // Strip items stored in ref — no re-render needed when they change
   const stripLength = isMobile ? 40 : 60
   const targetPos = isMobile ? 32 : 52
   const [stripItems, setStripItems] = useState<Item[]>([])
@@ -59,14 +56,12 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
   useEffect(() => {
     if (!spinning || items.length === 0) return
 
-    // Build strip synchronously before starting animation
     const strip: Item[] = []
     for (let i = 0; i < stripLength; i++) {
       strip.push(i === targetPos ? targetItem : items[Math.floor(Math.random() * items.length)])
     }
     setStripItems(strip)
 
-    // Wait one frame for React to render the strip, then start animating
     const raf = requestAnimationFrame(() => {
       const containerWidth = containerRef.current?.offsetWidth ?? maxWidth
       const centerOffset = Math.floor(containerWidth / 2)
@@ -81,11 +76,9 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
       const animate = (now: number) => {
         const elapsed = now - startTime
         const t = Math.min(elapsed / duration, 1)
-        // Cubic ease-out
         const eased = 1 - Math.pow(1 - t, 3)
         const offset = startOffset + distance * eased
 
-        // Directly mutate DOM — zero React overhead
         if (trackRef.current) {
           trackRef.current.style.transform = `translateX(-${offset}px)`
         }
@@ -116,95 +109,59 @@ export default function CaseSpinner({ items, targetItem, onComplete, spinning, s
   }, [spinning, targetItem, items, onComplete, speed, totalItem, itemW, stripLength, targetPos, maxWidth, muted])
 
   return (
-    <Box
+    <div
       ref={containerRef}
-      sx={{
-        position: "relative",
-        width: "100%",
-        maxWidth: maxWidth,
-        overflow: "hidden",
-        borderRadius: 2,
-        border: "2px solid #1976d2",
-        bgcolor: "#f0f7ff",
-        mx: "auto",
-      }}
+      className="relative w-full overflow-hidden rounded-xl border-2 border-primary bg-blue-50 dark:bg-slate-800 mx-auto"
+      style={{ maxWidth }}
     >
       {/* Center marker */}
-      <Box
-        sx={{
-          position: "absolute",
-          left: "50%",
-          top: 0,
-          bottom: 0,
-          width: 3,
-          bgcolor: "primary.main",
-          zIndex: 10,
-          transform: "translateX(-50%)",
-          boxShadow: "0 0 8px #1976d2",
-          pointerEvents: "none",
-        }}
+      <div
+        className="absolute left-1/2 top-0 bottom-0 w-[3px] bg-primary z-10 -translate-x-1/2 pointer-events-none"
+        style={{ boxShadow: "0 0 8px var(--color-primary)" }}
       />
       {/* Fade edges */}
-      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to right, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
-      <Box sx={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 48, background: "linear-gradient(to left, #f0f7ff, transparent)", zIndex: 5, pointerEvents: "none" }} />
+      <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-blue-50 dark:from-slate-800 to-transparent z-[5] pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-blue-50 dark:from-slate-800 to-transparent z-[5] pointer-events-none" />
 
-      {/* Track — driven by direct DOM style, not React state */}
-      <Box
+      <div
         ref={trackRef}
-        sx={{
-          display: "flex",
-          gap: `${itemGap}px`,
-          willChange: "transform",
-          py: 1,
-          px: "4px",
-        }}
+        className="flex py-2 px-1 will-change-transform"
+        style={{ gap: itemGap }}
       >
         {stripItems.map((item, i) => {
           const color = RARITY_COLORS[item.rarity as Rarity]
           const glow = RARITY_GLOW[item.rarity as Rarity]
           return (
-            <Box
+            <div
               key={i}
-              sx={{
+              className="shrink-0 flex flex-col items-center gap-1 rounded-xl border-2 bg-white dark:bg-slate-900"
+              style={{
                 width: itemW,
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 0.5,
-                p: isMobile ? 0.5 : 1,
-                borderRadius: 2,
-                border: `2px solid ${color}`,
+                borderColor: color,
                 boxShadow: glow,
-                bgcolor: "#fff",
+                padding: isMobile ? "4px" : "8px",
               }}
             >
-              <Box
-                component="img"
+              <img
                 src={item.image_url}
                 alt={item.name}
-                sx={{ width: isMobile ? 52 : 80, height: isMobile ? 52 : 80, objectFit: "contain" }}
+                style={{ width: isMobile ? 52 : 80, height: isMobile ? 52 : 80 }}
+                className="object-contain"
               />
-              <Typography
-                variant="caption"
-                fontWeight={600}
-                textAlign="center"
-                sx={{
+              <span
+                className="font-semibold text-center leading-tight overflow-hidden text-ellipsis whitespace-nowrap block"
+                style={{
                   color,
                   fontSize: isMobile ? "0.55rem" : "0.65rem",
-                  lineHeight: 1.2,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                   maxWidth: isMobile ? 80 : 120,
                 }}
               >
                 {item.name}
-              </Typography>
-            </Box>
+              </span>
+            </div>
           )
         })}
-      </Box>
-    </Box>
+      </div>
+    </div>
   )
 }

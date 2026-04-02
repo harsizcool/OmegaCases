@@ -1,14 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Box, Button, Card, CardContent, Typography, CircularProgress, Container, Alert } from "@mui/material"
-import { useAuth } from "@/lib/auth-context"
+import { useParams } from "next/navigation"
 import NextLink from "next/link"
+import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/lib/auth-context"
 
 export default function OAuthConsentPage() {
   const params = useParams()
-  const router = useRouter()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [req, setReq] = useState<any>(null)
@@ -20,18 +22,11 @@ export default function OAuthConsentPage() {
   useEffect(() => {
     const loadRequest = async () => {
       try {
-        const res = await fetch("/api/admin/settings")
-        const db_data = await res.json()
-        
-        // Fetch the oauth_request directly by calling an internal endpoint
         const check = await fetch(`/api/oauth/info?id=${requestId}`)
         const data = await check.json()
-        if (!data.success) {
-          setError("Request not found or expired")
-          return
-        }
+        if (!data.success) { setError("Request not found or expired"); return }
         setReq(data.request)
-      } catch (e) {
+      } catch {
         setError("Failed to load request")
       } finally {
         setLoading(false)
@@ -42,34 +37,32 @@ export default function OAuthConsentPage() {
 
   if (!user) {
     return (
-      <Container maxWidth="sm" sx={{ py: 6 }}>
+      <div className="max-w-sm mx-auto px-4 py-12">
         <Card>
-          <CardContent>
-            <Typography variant="h6" color="error" gutterBottom>
-              Not authenticated
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Please <NextLink href="/login" style={{ color: "#1565c0", fontWeight: 600 }}>sign in</NextLink> to continue.
-            </Typography>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-bold text-destructive mb-2">Not authenticated</h2>
+            <p className="text-sm text-muted-foreground">
+              Please <NextLink href="/login" className="text-primary font-semibold hover:underline">sign in</NextLink> to continue.
+            </p>
           </CardContent>
         </Card>
-      </Container>
+      </div>
     )
   }
 
   if (loading) {
     return (
-      <Container maxWidth="sm" sx={{ py: 12, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
+      <div className="flex justify-center py-24">
+        <Loader2 size={32} className="animate-spin text-muted-foreground" />
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Container maxWidth="sm" sx={{ py: 6 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <div className="max-w-sm mx-auto px-4 py-12">
+        <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
+      </div>
     )
   }
 
@@ -87,7 +80,7 @@ export default function OAuthConsentPage() {
       } else {
         setError(data.message || "Failed to process request")
       }
-    } catch (e) {
+    } catch {
       setError("Error processing request")
     } finally {
       setConfirming(false)
@@ -95,65 +88,41 @@ export default function OAuthConsentPage() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Card sx={{ borderRadius: 2, boxShadow: "0 4px 12px rgba(21, 101, 192, 0.1)" }}>
-        <CardContent sx={{ p: 4 }}>
-          <Box sx={{ mb: 3, textAlign: "center" }}>
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Connect with OmegaCases
-            </Typography>
-          </Box>
+    <div className="max-w-sm mx-auto px-4 py-12">
+      <Card>
+        <CardContent className="p-8 flex flex-col gap-4">
+          <h1 className="text-xl font-bold text-center">Connect with OmegaCases</h1>
 
-          <Box sx={{ bgcolor: "#f5f5f5", p: 2, borderRadius: 1, mb: 3, textAlign: "center" }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Service:
-            </Typography>
-            <Typography variant="body1" fontWeight={600}>
-              {req?.service_name}
-            </Typography>
-          </Box>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Service:</p>
+            <p className="font-semibold">{req?.service_name}</p>
+          </div>
 
-          <Box sx={{ bgcolor: "#f5f5f5", p: 2, borderRadius: 1, mb: 4, textAlign: "center" }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Connecting user:
-            </Typography>
-            <Typography variant="body1" fontWeight={600} sx={{ fontFamily: "monospace", fontSize: "0.95rem" }}>
-              {user.id.slice(0, -3)}***
-            </Typography>
-          </Box>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Connecting user:</p>
+            <p className="font-semibold font-mono text-sm">{user.id.slice(0, -3)}***</p>
+          </div>
 
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body2" fontWeight={600} gutterBottom>
-              This service will receive:
-            </Typography>
-            <Box component="ul" sx={{ m: 1, pl: 2, fontSize: "0.9rem" }}>
+          <div>
+            <p className="text-sm font-semibold mb-2">This service will receive:</p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
               {req?.get_user_id && <li>Your user ID</li>}
               {req?.get_username && <li>Your username</li>}
               {req?.get_balance && <li>Your balance</li>}
-            </Box>
-          </Box>
+            </ul>
+          </div>
 
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <Button
-              variant="outlined"
-              fullWidth
-              disabled={confirming}
-              onClick={() => handleConfirm(false)}
-            >
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" disabled={confirming} onClick={() => handleConfirm(false)}>
               Decline
             </Button>
-            <Button
-              variant="contained"
-              fullWidth
-              disabled={confirming}
-              onClick={() => handleConfirm(true)}
-              sx={{ bgcolor: "#1565c0" }}
-            >
+            <Button className="flex-1 gap-2" disabled={confirming} onClick={() => handleConfirm(true)}>
+              {confirming && <Loader2 size={14} className="animate-spin" />}
               {confirming ? "Processing..." : "Connect"}
             </Button>
-          </Box>
+          </div>
         </CardContent>
       </Card>
-    </Container>
+    </div>
   )
 }

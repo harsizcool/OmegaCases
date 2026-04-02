@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { Box } from "@mui/material"
 
 interface Particle {
   x: number
@@ -39,7 +38,6 @@ export default function Confetti({ active }: { active: boolean }) {
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
 
-    // Spawn particles
     for (let i = 0; i < 200; i++) {
       particlesRef.current.push({
         x: Math.random() * canvas.width,
@@ -70,7 +68,7 @@ export default function Confetti({ active }: { active: boolean }) {
 
         p.x += p.vx
         p.y += p.vy
-        p.vy += 0.08 // gravity
+        p.vy += 0.08
         p.rot += p.rotSpeed
         p.life -= 0.007
 
@@ -89,16 +87,9 @@ export default function Confetti({ active }: { active: boolean }) {
   if (!active) return null
 
   return (
-    <Box
-      component="canvas"
+    <canvas
       ref={canvasRef}
-      sx={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        pointerEvents: "none",
-        zIndex: 9999,
-      }}
+      className="fixed inset-0 pointer-events-none z-[9999]"
     />
   )
 }
