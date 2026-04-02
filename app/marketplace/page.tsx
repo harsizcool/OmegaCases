@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
-import { Filter, Plus, ArrowLeft, Clock, Loader2, LayoutList, Pencil, Trash2, Timer } from "lucide-react"
+import { Filter, Plus, ArrowLeft, Clock, Loader2, LayoutList, Pencil, Trash2, Timer, TrendingUp, TrendingDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -19,6 +19,36 @@ import { useRouter } from "next/navigation"
 import FilterPanel from "@/components/marketplace-filter-panel"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
+
+function PriceTrend({ price, rap }: { price: number; rap: number }) {
+  if (!rap || rap <= 0) return null
+  const pct = ((price - rap) / rap) * 100
+  if (Math.abs(pct) < 0.1) return null // essentially at RAP — skip noise
+  const below = pct < 0
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={`inline-flex items-center gap-0.5 text-[0.58rem] font-bold rounded px-1 py-0.5 leading-none ${
+              below
+                ? "bg-green-500/15 text-green-400 border border-green-500/20"
+                : "bg-red-500/15 text-red-400 border border-red-500/20"
+            }`}
+          >
+            {below ? <TrendingDown size={8} /> : <TrendingUp size={8} />}
+            {Math.abs(pct).toFixed(1)}%
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {below
+            ? `${Math.abs(pct).toFixed(1)}% below RAP ($${rap.toFixed(2)})`
+            : `${Math.abs(pct).toFixed(1)}% above RAP ($${rap.toFixed(2)})`}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 const MAX_LISTING_PRICE = 800
 const STORAGE_KEY = "omegacases_marketplace_filters"
 
@@ -442,10 +472,15 @@ export default function MarketplacePage() {
                             <TooltipContent>{item.name}</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        <p className={`text-sm font-bold ${listing.status === "sold" ? "text-muted-foreground" : "text-primary"}`}>
-                          ${Number(listing.price).toFixed(2)}
-                          {listing.status === "sold" && <span className="ml-1 text-[0.55rem] font-bold bg-muted text-muted-foreground rounded px-1 py-0.5">SOLD</span>}
-                        </p>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <p className={`text-sm font-bold ${listing.status === "sold" ? "text-muted-foreground" : "text-primary"}`}>
+                            ${Number(listing.price).toFixed(2)}
+                            {listing.status === "sold" && <span className="ml-1 text-[0.55rem] font-bold bg-muted text-muted-foreground rounded px-1 py-0.5">SOLD</span>}
+                          </p>
+                          {listing.status !== "sold" && (
+                            <PriceTrend price={Number(listing.price)} rap={Number(item.rap ?? 0)} />
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">by {listing.users?.username || "—"}</p>
                       </div>
                     </NextLink>
@@ -508,6 +543,7 @@ export default function MarketplacePage() {
                         <p className="text-sm font-semibold truncate">{item.name}</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-bold text-primary">${Number(listing.price).toFixed(2)}</span>
+                          <PriceTrend price={Number(listing.price)} rap={Number(item.rap ?? 0)} />
                           {inCooldown && (
                             <span className="flex items-center gap-1 text-[0.65rem] font-bold text-amber-400">
                               <Timer size={10} /> {remaining}s

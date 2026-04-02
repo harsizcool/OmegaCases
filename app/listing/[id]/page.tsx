@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import NextLink from "next/link"
 import dynamic from "next/dynamic"
-import { Loader2, ArrowLeft, ShoppingCart, Clock } from "lucide-react"
+import { Loader2, ArrowLeft, ShoppingCart, Clock, TrendingUp, TrendingDown } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -153,9 +153,33 @@ export default function ListingPage() {
               <span className="text-muted-foreground">Active Supply</span>
               <span className="font-semibold">{listing.supply_count ?? 0} listing{listing.supply_count !== 1 ? "s" : ""}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Listing Price</span>
-              <span className="font-bold text-primary text-lg">${Number(listing.price).toFixed(2)}</span>
+              <div className="flex items-center gap-1.5">
+                {(() => {
+                  const rap = Number(item?.rap || 0)
+                  const price = Number(listing.price)
+                  if (!rap || Math.abs(((price - rap) / rap) * 100) < 0.1) return null
+                  const pct = ((price - rap) / rap) * 100
+                  const below = pct < 0
+                  return (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`inline-flex items-center gap-0.5 text-[0.65rem] font-bold rounded px-1.5 py-0.5 leading-none ${below ? "bg-green-500/15 text-green-400 border border-green-500/20" : "bg-red-500/15 text-red-400 border border-red-500/20"}`}>
+                            {below ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+                            {Math.abs(pct).toFixed(1)}%
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          {below ? `${Math.abs(pct).toFixed(1)}% below RAP` : `${Math.abs(pct).toFixed(1)}% above RAP`}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )
+                })()}
+                <span className="font-bold text-primary text-lg">${Number(listing.price).toFixed(2)}</span>
+              </div>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Item RAP</span>
