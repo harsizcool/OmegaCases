@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createHash } from "crypto"
 
 // Mining constants
-const BLOCK_REWARD_GENESIS = 0.32          // initial reward per block
-const HALVING_INTERVAL = 256               // blocks between halvings
+const BLOCK_REWARD_GENESIS = 0.12          // initial reward per block
+const HALVING_INTERVAL = 64                // blocks between halvings
 const TARGET_BLOCK_TIME_MS = 6 * 60 * 1000 // 6 minutes in ms
 const DIFFICULTY_ADJUSTMENT_INTERVAL = 32  // adjust every N blocks
 const MIN_ADJUSTMENT_FACTOR = 0.5
