@@ -213,9 +213,10 @@ export async function POST(req: Request) {
       const actualMs = newest - oldest
       const expectedMs = (DIFFICULTY_ADJUSTMENT_INTERVAL - 1) * TARGET_BLOCK_TIME_MS
 
-      // adjustment_factor: < 1 means blocks were too fast → lower target (harder)
-      //                    > 1 means blocks were too slow → raise target (easier)
-      const rawFactor = expectedMs / Math.max(actualMs, 1)
+      // adjustment_factor = actualMs / expectedMs (same as Bitcoin's retarget)
+      // blocks too fast → actualMs < expectedMs → factor < 1 → target shrinks (harder)
+      // blocks too slow → actualMs > expectedMs → factor > 1 → target grows (easier)
+      const rawFactor = actualMs / Math.max(expectedMs, 1)
       const factor = clamp(rawFactor, MIN_ADJUSTMENT_FACTOR, MAX_ADJUSTMENT_FACTOR)
 
       const currentTargetBig = targetToBigInt(currentTarget)
