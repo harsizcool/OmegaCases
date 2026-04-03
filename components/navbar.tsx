@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Cpu } from "lucide-react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Cpu, Layers3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -27,6 +27,7 @@ const NAV_LINKS = [
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
   { href: "/chat",        label: "Chat",        icon: MessageSquare },
+  { href: "/arcade",      label: "Arcade",      icon: Layers3 },
   { href: "/mine",        label: "Mining",      icon: Cpu },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ]

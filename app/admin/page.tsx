@@ -65,6 +65,14 @@ export default function AdminPage() {
   const [cpSuccess, setCpSuccess] = useState(false)
   const [cpError, setCpError] = useState("")
 
+  const [arcadeEnabled, setArcadeEnabled] = useState(true)
+  const [arcadeHouseEdge, setArcadeHouseEdge] = useState("0.01")
+  const [arcadeMinBet, setArcadeMinBet] = useState("0.01")
+  const [arcadeMaxBet, setArcadeMaxBet] = useState("100")
+  const [arcadeSaving, setArcadeSaving] = useState(false)
+  const [arcadeSuccess, setArcadeSuccess] = useState(false)
+  const [arcadeError, setArcadeError] = useState("")
+
   const [paymentsPaused, setPaymentsPaused] = useState(true)
   const [ppSaving, setPpSaving] = useState(false)
   const [ppSuccess, setPpSuccess] = useState(false)
@@ -150,8 +158,32 @@ export default function AdminPage() {
       if (data.banner?.text !== undefined) setBannerText(data.banner.text)
       if (data.banner?.color) setBannerColor(data.banner.color)
       if (typeof data.payments_paused === "boolean") setPaymentsPaused(data.payments_paused)
+      if (typeof data.arcade_enabled === "boolean") setArcadeEnabled(data.arcade_enabled)
+      if (data.arcade_house_edge !== undefined) setArcadeHouseEdge(String(data.arcade_house_edge))
+      if (data.arcade_min_bet !== undefined) setArcadeMinBet(String(data.arcade_min_bet))
+      if (data.arcade_max_bet !== undefined) setArcadeMaxBet(String(data.arcade_max_bet))
     } catch {}
     setCapsLoading(false)
+  }
+
+  const saveArcade = async () => {
+    setArcadeSaving(true); setArcadeError(""); setArcadeSuccess(false)
+    try {
+      if (!user?.id) throw new Error("Not authenticated")
+      const save = (key: string, value: any) =>
+        fetch("/api/admin/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, value, user_id: user.id }),
+        })
+      await Promise.all([
+        save("arcade_enabled", arcadeEnabled),
+        save("arcade_house_edge", parseFloat(arcadeHouseEdge)),
+        save("arcade_min_bet", parseFloat(arcadeMinBet)),
+        save("arcade_max_bet", parseFloat(arcadeMaxBet)),
+      ])
+      setArcadeSuccess(true)
+    } catch (e: any) { setArcadeError(e.message) } finally { setArcadeSaving(false) }
   }
 
   const saveCaps = async () => {
@@ -541,6 +573,51 @@ export default function AdminPage() {
               <Button className="gap-2 self-start" disabled={bannerSaving} onClick={saveBanner}>
                 {bannerSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {bannerSaving ? "Saving..." : "Save Banner"}
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Arcade Settings */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-base font-bold">Arcade Settings</h2>
+              <p className="text-xs text-muted-foreground -mt-2">Controls Towers &amp; Mines house edge and bet limits. House edge of 0.01 = 1%.</p>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="arcadeEnabled"
+                  checked={arcadeEnabled}
+                  onChange={e => setArcadeEnabled(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="arcadeEnabled" className="text-sm cursor-pointer">Arcade Enabled</Label>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">House Edge (0–1)</Label>
+                  <Input type="number" value={arcadeHouseEdge} step={0.001} min={0} max={0.5}
+                    onChange={e => setArcadeHouseEdge(e.target.value)} />
+                  <p className="text-[0.65rem] text-muted-foreground">{(parseFloat(arcadeHouseEdge || "0") * 100).toFixed(1)}%</p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Min Bet ($)</Label>
+                  <Input type="number" value={arcadeMinBet} step={0.01} min={0.01}
+                    onChange={e => setArcadeMinBet(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Max Bet ($)</Label>
+                  <Input type="number" value={arcadeMaxBet} step={1} min={1}
+                    onChange={e => setArcadeMaxBet(e.target.value)} />
+                </div>
+              </div>
+
+              {arcadeError && <Alert variant="destructive"><AlertDescription>{arcadeError}</AlertDescription></Alert>}
+              {arcadeSuccess && <Alert><AlertDescription className="text-green-600">Arcade settings saved!</AlertDescription></Alert>}
+              <Button className="gap-2 self-start" disabled={arcadeSaving} onClick={saveArcade}>
+                {arcadeSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {arcadeSaving ? "Saving..." : "Save Arcade Settings"}
               </Button>
             </div>
           </div>
