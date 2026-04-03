@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Cpu, Layers3 } from "lucide-react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Cpu, Code2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -27,7 +27,6 @@ const NAV_LINKS = [
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
   { href: "/chat",        label: "Chat",        icon: MessageSquare },
-  { href: "/arcade",      label: "Arcade",      icon: Layers3 },
   { href: "/mine",        label: "Mining",      icon: Cpu },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ]
@@ -383,6 +382,11 @@ export default function Navbar() {
                           <Settings size={13} /> Settings
                         </NextLink>
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <NextLink href="/developer" className="flex items-center gap-2 cursor-pointer">
+                          <Code2 size={13} /> Developer
+                        </NextLink>
+                      </DropdownMenuItem>
                       {user.admin && (
                         <DropdownMenuItem asChild>
                           <NextLink href="/admin" className="flex items-center gap-2 cursor-pointer">
@@ -494,6 +498,9 @@ export default function Navbar() {
                       </NextLink>
                       <NextLink href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                         <Settings size={15} /> Settings
+                      </NextLink>
+                      <NextLink href="/developer" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <Code2 size={15} /> Developer
                       </NextLink>
                       {user.admin && (
                         <NextLink href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">

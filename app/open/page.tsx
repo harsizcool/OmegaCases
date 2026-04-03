@@ -51,12 +51,19 @@ export default function OpenPage() {
   const [error, setError] = useState("")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
 
+  const [clientSeed, setClientSeed] = useState("omegacases")
   const [doubleSpeed, setDoubleSpeed] = useState(false)
   useEffect(() => {
     try {
       setDoubleSpeed(localStorage.getItem("omegacases_2x_speed") === "true")
+      const saved = localStorage.getItem("omegacases_client_seed")
+      if (saved) setClientSeed(saved)
     } catch {}
   }, [])
+  const handleClientSeedChange = (val: string) => {
+    setClientSeed(val)
+    try { localStorage.setItem("omegacases_client_seed", val) } catch {}
+  }
   const toggleDoubleSpeed = () => {
     setDoubleSpeed((prev) => {
       const next = !prev
@@ -111,7 +118,7 @@ export default function OpenPage() {
       const res = await fetch("/api/cases/open", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
+        body: JSON.stringify({ user_id: user.id, client_seed: clientSeed }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to open case")
@@ -311,6 +318,15 @@ export default function OpenPage() {
                     <Crown size={9} /> Plus
                   </span>
                 )}
+              </div>
+              <div className="flex items-center gap-2 mt-2 justify-center">
+                <span className="text-xs text-muted-foreground">Client seed:</span>
+                <input
+                  value={clientSeed}
+                  onChange={e => handleClientSeedChange(e.target.value)}
+                  className="text-xs font-mono bg-muted border border-border rounded px-2 py-0.5 w-40 outline-none focus:border-primary transition-colors"
+                  placeholder="omegacases"
+                />
               </div>
             </div>
           )}
