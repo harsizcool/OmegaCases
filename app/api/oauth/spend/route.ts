@@ -74,5 +74,15 @@ export async function POST(req: Request) {
     body: `${appName} has spent $${spend.toFixed(2)} from your balance.`,
   })
 
+  // Notify owner they received the funds (only if different user)
+  if (ownerId !== tok.user_id) {
+    await createNotification({
+      user_id: ownerId,
+      type: "oauth_spend",
+      title: `Received $${spend.toFixed(2)} via ${appName}`,
+      body: `A user redeemed $${spend.toFixed(2)} through ${appName} and it was sent to your account.`,
+    })
+  }
+
   return NextResponse.json({ ok: true, spent: spend, new_balance: spenderNewBal })
 }

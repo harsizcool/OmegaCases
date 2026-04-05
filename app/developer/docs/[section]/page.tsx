@@ -112,6 +112,8 @@ function Overview() {
         <Row method="GET"  path="/api/oauth/me?token=xxx"        desc="Fetch authorized user info" />
         <Row method="POST" path="/api/oauth/spend"               desc="Spend balance on behalf of user" />
         <Row method="POST" path="/api/oauth/cases/open"           desc="Open a case on behalf of user" />
+        <Row method="POST" path="/api/oauth/listings/buy"         desc="Buy a marketplace listing on behalf of user" />
+        <Row method="POST" path="/api/oauth/notify"               desc="Send an in-app notification to user" />
         <Row method="GET"  path="/api/admin/items"               desc="All items (public)" />
         <Row method="GET"  path="/api/rolls?limit=50"            desc="Recent rolls (public)" />
         <Row method="GET"  path="/api/leaderboard"               desc="Leaderboard (public)" />
@@ -172,8 +174,10 @@ const state    = p.get("state")    // verify matches what you sent`}
         ["read_id",       "User UUID — returned in callback"],
         ["read_username", "Username — returned in callback"],
         ["read_balance",  "Balance — returned in callback and /api/oauth/me"],
-        ["spend_balance", "Deduct balance and credit app owner via /api/oauth/spend"],
-        ["write_cases",   "Open cases on behalf of the user"],
+        ["spend_balance", "Deduct balance, credited to app owner via /api/oauth/spend"],
+        ["buy_listing",   "Buy marketplace listings via /api/oauth/listings/buy"],
+        ["write_cases",   "Open cases on behalf of user via /api/oauth/cases/open"],
+        ["notify",        "Send in-app notifications via /api/oauth/notify"],
       ]} />
     </>
   )
@@ -298,12 +302,16 @@ function PublicDocs() {
       <Card>
         <CardHead>GET /api/rolls?limit=50 — recent rolls</CardHead>
         <CardBody>
+          <p className="text-sm text-muted-foreground mb-3">Returns the most recent rolls. <Code>limit</Code> is respected (1–200, default 30).</p>
           <Block lang="response" label="Response">{`[
   {
     "id":         "uuid",
     "created_at": "2025-01-01T00:00:00Z",
-    "user":       { "username": "player1" },
-    "item":       { "name": "Dragon Claw", "rarity": "Legendary" }
+    "username":   "player1",
+    "item_name":  "Dragon Claw",
+    "image_url":  "https://...",
+    "rarity":     "Legendary",
+    "rap":        45.00
   }
 ]`}
           </Block>
@@ -328,6 +336,7 @@ function PublicDocs() {
       <Card>
         <CardHead>GET /api/users?username=x — user profile</CardHead>
         <CardBody>
+          <p className="text-sm text-muted-foreground mb-3">Look up a single user by exact username (case-insensitive). Also supports <Code>?id=uuid</Code>.</p>
           <Block lang="response" label="Response">{`{
   "id":          "uuid",
   "username":    "player1",
@@ -351,6 +360,132 @@ function PublicDocs() {
           </Block>
         </CardBody>
       </Card>
+
+      <Card>
+        <CardHead>GET /api/listings — marketplace listings</CardHead>
+        <CardBody>
+          <p className="text-sm text-muted-foreground mb-3">Paginated active listings. Supports filtering, sorting, and search.</p>
+          <Block lang="js" label="Query params">{`page=0          // page number (default 0)
+limit=24        // results per page (default 24, max 1000)
+sortBy=price    // "price" or "created_at"
+sortDir=asc     // "asc" or "desc"
+minPrice=1.00   // minimum price filter
+maxPrice=50.00  // maximum price filter
+search=dragon   // filter by item name
+rarity=Rare     // filter by rarity (comma-separated: "Rare,Legendary")`}
+          </Block>
+          <Block lang="response" label="Response">{`{
+  "listings": [
+    {
+      "id":       "uuid",
+      "price":    12.50,
+      "status":   "active",
+      "items":    { "name": "Dragon Claw", "rarity": "Legendary", "rap": 45.00 },
+      "users":    { "username": "seller1" }
+    }
+  ],
+  "total":    142,
+  "page":     0,
+  "pageSize": 24
+}`}
+          </Block>
+        </CardBody>
+      </Card>
+    </>
+  )
+}
+
+function ListingsDocs() {
+  return (
+    <>
+      <H1>Buy Listings</H1>
+      <Desc>Purchase a marketplace listing on behalf of an authorized user. Balance is deducted from the user and the seller is credited.</Desc>
+
+      <Card>
+        <CardHead>POST /api/oauth/listings/buy</CardHead>
+        <CardBody>
+          <Block lang="js" label="Request">{`fetch("${BASE}/api/oauth/listings/buy", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    token:      "user_token_here",
+    listing_id: "uuid-of-listing"
+  })
+})`}
+          </Block>
+          <Block lang="response" label="Success response">{`{
+  "ok":          true,
+  "item_name":   "Dragon Claw",
+  "price":       12.50,
+  "new_balance": 37.50
+}`}
+          </Block>
+          <Block lang="response" label="Error responses">{`{ "error": "Invalid or revoked token" }             // 401
+{ "error": "Token does not have buy_listing scope" }  // 403
+{ "error": "Listing not found or already sold" }      // 404
+{ "error": "Cannot buy your own listing" }            // 400
+{ "error": "Insufficient balance" }                   // 402`}
+          </Block>
+        </CardBody>
+      </Card>
+
+      <H2>Getting listing IDs</H2>
+      <p className="text-sm text-muted-foreground mb-3">
+        Fetch active listings from the public API to get <Code>listing_id</Code> values:
+      </p>
+      <Block lang="js" label="Fetch listings">{`const res = await fetch("${BASE}/api/listings?limit=24&page=0")
+const { listings } = await res.json()
+// listings[0].id is the listing_id to pass`}
+      </Block>
+    </>
+  )
+}
+
+function NotifyDocs() {
+  return (
+    <>
+      <H1>Notifications</H1>
+      <Desc>Send an in-app notification to a user who has authorized your app. The notification appears under their bell icon.</Desc>
+
+      <Card>
+        <CardHead>POST /api/oauth/notify</CardHead>
+        <CardBody>
+          <Block lang="js" label="Request">{`fetch("${BASE}/api/oauth/notify", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    token: "user_token_here",
+    title: "Your order shipped",
+    body:  "Your item is on its way!"
+  })
+})`}
+          </Block>
+          <Block lang="response" label="Success response">{`{ "ok": true }`}
+          </Block>
+          <Block lang="response" label="Error responses">{`{ "error": "Invalid or revoked token" }        // 401
+{ "error": "Token does not have notify scope" } // 403`}
+          </Block>
+        </CardBody>
+      </Card>
+
+      <H2>How it appears</H2>
+      <div className="border border-border rounded-xl overflow-hidden mb-4">
+        {[
+          ["Title",  "Prefixed with app name: \"MyApp: Your order shipped\""],
+          ["Body",   "Your body text, shown in full"],
+          ["Link",   "No link — notification is display-only"],
+          ["Unread", "Shows as unread until the user opens notifications"],
+        ].map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[80px_1fr] px-4 py-2.5 border-b border-border/40 last:border-0 items-start">
+            <span className="text-xs font-semibold">{k}</span>
+            <span className="text-xs text-muted-foreground">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        You can also send notifications directly from the <strong>Developer Dashboard</strong> → Notify tab without writing any code.
+      </p>
     </>
   )
 }
@@ -434,6 +569,8 @@ const PAGES: Record<string, React.FC> = {
   tokens:   TokensDocs,
   spend:    SpendDocs,
   cases:    CasesDocs,
+  listings: ListingsDocs,
+  notify:   NotifyDocs,
   public:   PublicDocs,
 }
 

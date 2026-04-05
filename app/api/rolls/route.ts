@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requirePlusUser } from "@/lib/require-plus"
 
 export async function GET(req: NextRequest) {
-  // Require Plus auth for external/API-doc access when user_id param is provided.
-  // If called without user_id it's an internal live-feed call — allow it (used server-side for the rolls feed).
-  const userId = req.nextUrl.searchParams.get("user_id")
-  if (userId !== null) {
-    const auth = await requirePlusUser(userId)
-    if (auth.error) return auth.error
-  }
+  const limitParam = req.nextUrl.searchParams.get("limit")
+  const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10)), 200) : 30
 
   const supabase = await createClient()
 
@@ -24,11 +18,11 @@ export async function GET(req: NextRequest) {
       items ( name, image_url, rarity, rap )
     `)
     .order("created_at", { ascending: false })
-    .limit(30)
+    .limit(limit)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const rolls = (data ?? []).reverse().map((r: any) => ({
+  const rolls = (data ?? []).map((r: any) => ({
     id: r.id,
     created_at: r.created_at,
     user_id: r.user_id,

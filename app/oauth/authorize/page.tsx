@@ -11,7 +11,9 @@ const SCOPE_LABELS: Record<string, string> = {
   read_username: "Read your username",
   read_balance:  "Read your balance",
   spend_balance: "Spend balance on your behalf",
+  buy_listing:   "Buy marketplace listings on your behalf",
   write_cases:   "Open cases on your behalf",
+  notify:        "Send you in-app notifications",
 }
 
 function AuthorizeContent() {
