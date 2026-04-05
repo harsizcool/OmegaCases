@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "case_count must be between 1 and 50" }, { status: 400 })
   }
 
-  const caseCost = case_count * (exclusive ? 50 : 1)
+  const caseCost = case_count * (exclusive ? 100 : 1)
 
   const { data: user } = await db
     .from("users")

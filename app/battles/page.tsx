@@ -50,7 +50,7 @@ export default function BattlesPage() {
   const effectiveCount = customMode
     ? Math.max(1, Math.min(50, parseInt(customInput, 10) || 1))
     : selectedCount
-  const caseCost = effectiveCount * (exclusive ? 50 : 1)
+  const caseCost = effectiveCount * (exclusive ? 100 : 1)
 
   const fetchBattles = useCallback(async () => {
     try {
@@ -209,7 +209,7 @@ export default function BattlesPage() {
                     Exclusives Mode
                   </p>
                   <p className="text-[0.6rem] text-muted-foreground leading-tight">
-                    Only Legendaries &amp; Omegas · 50 cases per round
+                    Only Legendaries &amp; Omegas · 100 cases per round
                   </p>
                 </div>
                 <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
@@ -281,7 +281,7 @@ export default function BattlesPage() {
           ) : (
             battles.map((battle) => {
               const isOwn = user?.id === battle.creator_id
-              const joinCost = battle.case_count * (battle.exclusive ? 50 : 1)
+              const joinCost = battle.case_count * (battle.exclusive ? 100 : 1)
               const canJoin = user && !isOwn && casesAvailable >= joinCost
               return (
                 <div

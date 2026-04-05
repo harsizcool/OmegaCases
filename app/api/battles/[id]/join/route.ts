@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "User not found" }, { status: 404 })
   }
 
-  const caseCost = battle.case_count * (battle.exclusive ? 50 : 1)
+  const caseCost = battle.case_count * (battle.exclusive ? 100 : 1)
 
   if ((joiner.cases_remaining ?? 0) < caseCost) {
     await db.from("battles").update({ joiner_id: null, status: "waiting" }).eq("id", id)
