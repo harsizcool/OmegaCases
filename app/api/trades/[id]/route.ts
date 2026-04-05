@@ -45,7 +45,7 @@ export async function POST(
   if (action === "accept") {
     if (user_id !== trade.receiver_id) return NextResponse.json({ error: "Only receiver can accept" }, { status: 403 })
 
-    // Check balances
+    // Check balances before claiming
     const { data: sender } = await supabase.from("users").select("id, balance").eq("id", trade.sender_id).single()
     const { data: receiver } = await supabase.from("users").select("id, balance").eq("id", trade.receiver_id).single()
     if (!sender || !receiver) return NextResponse.json({ error: "User not found" }, { status: 404 })
@@ -56,6 +56,22 @@ export async function POST(
     if (Number(receiver.balance) < trade.receiver_balance) {
       return NextResponse.json({ error: "You no longer have enough balance" }, { status: 400 })
     }
+
+    // ── Atomic claim ────────────────────────────────────────────────────────
+    // Only one concurrent request can win this update. If status is no longer
+    // "pending" (another request already accepted it), data will be null → 409.
+    const { data: claimed } = await supabase
+      .from("trades")
+      .update({ status: "accepted", updated_at: new Date().toISOString() })
+      .eq("id", trade_id)
+      .eq("status", "pending")   // ← guard: fails if already accepted/declined
+      .select("id")
+      .single()
+
+    if (!claimed) {
+      return NextResponse.json({ error: "Trade was already processed" }, { status: 409 })
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Swap inventory items
     const senderItems = trade.trade_items.filter((ti: any) => ti.side === "sender").map((ti: any) => ti.inventory_id)
@@ -74,9 +90,7 @@ export async function POST(
     await supabase.from("users").update({ balance: senderNewBalance }).eq("id", trade.sender_id)
     await supabase.from("users").update({ balance: receiverNewBalance }).eq("id", trade.receiver_id)
 
-    await supabase.from("trades").update({ status: "accepted", updated_at: new Date().toISOString() }).eq("id", trade_id)
-
-    // Notify sender their trade was accepted
+    // Notify sender
     await createNotification({
       user_id: trade.sender_id,
       type: "trade_accepted",
