@@ -31,7 +31,7 @@ function shouldShowHeader(msgs: Message[], idx: number) {
   return new Date(cur.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60_000
 }
 
-// Render message text with @mention highlighting
+// Render message text with @mention highlighting and clickable links
 function MessageContent({
   content,
   myUsername,
@@ -39,10 +39,23 @@ function MessageContent({
   content: string
   myUsername?: string
 }) {
-  const parts = content.split(/(@\w+)/)
+  const parts = content.split(/(https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+)/)
   return (
     <p className="text-sm text-foreground/90 leading-relaxed break-words">
       {parts.map((part, i) => {
+        if (/^https?:\/\//.test(part)) {
+          return (
+            <a
+              key={i}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 opacity-90 hover:opacity-100 break-all"
+            >
+              {part}
+            </a>
+          )
+        }
         if (/^@\w+$/.test(part)) {
           const isMine = myUsername && part.toLowerCase() === `@${myUsername.toLowerCase()}`
           return (
