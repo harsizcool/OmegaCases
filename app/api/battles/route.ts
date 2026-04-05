@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data: battles } = await db
     .from("battles")
-    .select("id, creator_id, case_count, created_at, status")
+    .select("id, creator_id, case_count, created_at, status, exclusive")
     .eq("status", "waiting")
     .order("created_at", { ascending: false })
     .limit(50)
@@ -33,18 +33,20 @@ export async function GET() {
 export async function POST(req: Request) {
   const db = await createClient()
 
-  let body: { user_id: string; case_count: number }
+  let body: { user_id: string; case_count: number; exclusive?: boolean }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const { user_id, case_count } = body
+  const { user_id, case_count, exclusive = false } = body
   if (!user_id) return NextResponse.json({ error: "user_id required" }, { status: 400 })
   if (!Number.isInteger(case_count) || case_count < 1 || case_count > 50) {
     return NextResponse.json({ error: "case_count must be between 1 and 50" }, { status: 400 })
   }
+
+  const caseCost = case_count * (exclusive ? 50 : 1)
 
   const { data: user } = await db
     .from("users")
@@ -53,20 +55,20 @@ export async function POST(req: Request) {
     .single()
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 })
-  if ((user.cases_remaining ?? 0) < case_count) {
+  if ((user.cases_remaining ?? 0) < caseCost) {
     return NextResponse.json({ error: "Not enough cases" }, { status: 402 })
   }
 
   const { error: deductErr } = await db
     .from("users")
-    .update({ cases_remaining: user.cases_remaining - case_count })
+    .update({ cases_remaining: user.cases_remaining - caseCost })
     .eq("id", user_id)
 
   if (deductErr) return NextResponse.json({ error: deductErr.message }, { status: 500 })
 
   const { data: battle, error: battleErr } = await db
     .from("battles")
-    .insert({ creator_id: user_id, case_count, status: "waiting" })
+    .insert({ creator_id: user_id, case_count, exclusive, status: "waiting" })
     .select()
     .single()
 

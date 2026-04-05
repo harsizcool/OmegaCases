@@ -10,6 +10,13 @@ import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { RARITY_COLORS } from "@/lib/types"
 import BattleSpinner, { type SpinItem } from "@/components/battle-spinner"
+import Confetti from "@/components/confetti"
+
+const CONFETTI_SRC = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/confetti-pop-sound-fNcAXWXi7MdyVXwS9yqsN7dqp9PhVx.mp3"
+
+function playSound(src: string) {
+  try { const a = new Audio(src); a.volume = 0.6; a.play().catch(() => {}) } catch {}
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,6 +52,7 @@ interface Battle {
   winner_id: string | null
   status: "waiting" | "in_progress" | "completed" | "cancelled"
   case_count: number
+  exclusive: boolean
   created_at: string
   completed_at: string | null
   creator: BattleUser | null
@@ -103,6 +111,11 @@ export default function BattleRoomPage() {
   const [battle, setBattle] = useState<Battle | null>(null)
   const [allItems, setAllItems] = useState<SpinItem[]>([])
   const [pageStatus, setPageStatus] = useState<"loading" | "waiting" | "animating" | "done">("loading")
+  const [confettiActive, setConfettiActive] = useState(false)
+
+  // Always-fresh ref to battle for use in stable callbacks
+  const battleRef = useRef<Battle | null>(null)
+  battleRef.current = battle
 
   // Spinner state
   const [spinningRound, setSpinningRound] = useState<number | null>(null)
@@ -199,6 +212,18 @@ export default function BattleRoomPage() {
     doneCountRef.current = 0
     setRevealedRounds((prev) => new Set([...prev, round]))
 
+    // Confetti for any Omega pull in this round (battles only)
+    if (battleRef.current) {
+      const hasOmega = battleRef.current.rolls.some(
+        (r) => r.round === round && r.items.rarity === "Omega"
+      )
+      if (hasOmega) {
+        setConfettiActive(true)
+        playSound(CONFETTI_SRC)
+        setTimeout(() => setConfettiActive(false), 6000)
+      }
+    }
+
     setTimeout(() => {
       const next = round + 1
       if (next < totalRoundsRef.current) {
@@ -271,9 +296,14 @@ export default function BattleRoomPage() {
   if (pageStatus === "waiting") {
     return (
       <div className="max-w-md mx-auto px-4 py-10 flex flex-col items-center gap-5">
-        <div className="flex items-center gap-2">
-          <Swords size={18} className="text-primary" />
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          <Swords size={18} className={battle.exclusive ? "text-amber-400" : "text-primary"} />
           <h1 className="text-base font-bold">Battle #{battle.id.slice(0, 8)}</h1>
+          {battle.exclusive && (
+            <span className="flex items-center gap-1 text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 uppercase tracking-wide">
+              👑 Exclusives
+            </span>
+          )}
         </div>
 
         <div className="w-full bg-card border border-border/60 rounded-xl p-4 flex items-center gap-3">
@@ -392,6 +422,8 @@ export default function BattleRoomPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+      <Confetti active={confettiActive} />
+
       {/* Header */}
       <div className="flex items-center gap-2">
         <NextLink
@@ -400,8 +432,13 @@ export default function BattleRoomPage() {
         >
           <ArrowLeft size={15} />
         </NextLink>
-        <Swords size={15} className="text-primary" />
+        <Swords size={15} className={battle.exclusive ? "text-amber-400" : "text-primary"} />
         <span className="text-sm font-bold">Case Battle</span>
+        {battle.exclusive && (
+          <span className="flex items-center gap-1 text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 uppercase tracking-wide">
+            👑 Exclusives
+          </span>
+        )}
         <span className="text-xs text-muted-foreground font-mono">#{battle.id.slice(0, 8)}</span>
       </div>
 

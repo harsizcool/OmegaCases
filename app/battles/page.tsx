@@ -20,6 +20,7 @@ interface Battle {
   id: string
   creator_id: string
   case_count: number
+  exclusive: boolean
   status: string
   created_at: string
   creator: BattleUser | null
@@ -42,12 +43,14 @@ export default function BattlesPage() {
   const [selectedCount, setSelectedCount] = useState(1)
   const [customMode, setCustomMode] = useState(false)
   const [customInput, setCustomInput] = useState("")
+  const [exclusive, setExclusive] = useState(false)
   const customInputRef = useRef<HTMLInputElement>(null)
   const [joinError, setJoinError] = useState<string | null>(null)
 
   const effectiveCount = customMode
     ? Math.max(1, Math.min(50, parseInt(customInput, 10) || 1))
     : selectedCount
+  const caseCost = effectiveCount * (exclusive ? 50 : 1)
 
   const fetchBattles = useCallback(async () => {
     try {
@@ -81,7 +84,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, case_count: effectiveCount }),
+        body: JSON.stringify({ user_id: user.id, case_count: effectiveCount, exclusive }),
       })
       const data = res.ok ? await res.json() : null
       if (data?.battle?.id) {
@@ -116,7 +119,7 @@ export default function BattlesPage() {
   }
 
   const casesAvailable = user?.cases_remaining ?? 0
-  const hasEnough = casesAvailable >= effectiveCount && effectiveCount >= 1
+  const hasEnough = casesAvailable >= caseCost && effectiveCount >= 1
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -191,10 +194,40 @@ export default function BattlesPage() {
                 )}
               </div>
 
+              {/* Exclusives toggle */}
+              <button
+                onClick={() => setExclusive((e) => !e)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 transition-colors text-left ${
+                  exclusive
+                    ? "border-amber-500/60 bg-amber-500/10"
+                    : "border-border/60 hover:border-amber-500/30"
+                }`}
+              >
+                <span className="text-base">👑</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-bold ${exclusive ? "text-amber-400" : "text-muted-foreground"}`}>
+                    Exclusives Mode
+                  </p>
+                  <p className="text-[0.6rem] text-muted-foreground leading-tight">
+                    Only Legendaries &amp; Omegas · 50 cases per round
+                  </p>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                  exclusive ? "border-amber-500 bg-amber-500" : "border-border/60"
+                }`}>
+                  {exclusive && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+              </button>
+
               <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Cases needed</span>
-                  <span className="font-semibold">{effectiveCount}</span>
+                  <span className="font-semibold">
+                    {caseCost}
+                    {exclusive && caseCost !== effectiveCount && (
+                      <span className="text-muted-foreground font-normal"> ({effectiveCount}×50)</span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Your cases</span>
@@ -214,7 +247,7 @@ export default function BattlesPage() {
 
               {!hasEnough && (
                 <p className="text-xs text-muted-foreground text-center">
-                  Need {effectiveCount} cases.{" "}
+                  Need {caseCost} cases.{" "}
                   <NextLink href="/open" className="text-primary hover:underline">Get more</NextLink>
                 </p>
               )}
@@ -248,7 +281,8 @@ export default function BattlesPage() {
           ) : (
             battles.map((battle) => {
               const isOwn = user?.id === battle.creator_id
-              const canJoin = user && !isOwn && casesAvailable >= battle.case_count
+              const joinCost = battle.case_count * (battle.exclusive ? 50 : 1)
+              const canJoin = user && !isOwn && casesAvailable >= joinCost
               return (
                 <div
                   key={battle.id}
@@ -271,9 +305,10 @@ export default function BattlesPage() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1 bg-muted/60 rounded-lg px-2.5 py-1">
-                      <Swords size={10} className="text-muted-foreground" />
-                      <span className="text-xs font-bold">{battle.case_count}</span>
+                    <div className={`flex items-center gap-1 rounded-lg px-2.5 py-1 ${battle.exclusive ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted/60"}`}>
+                      {battle.exclusive && <span className="text-[0.6rem]">👑</span>}
+                      <Swords size={10} className={battle.exclusive ? "text-amber-400" : "text-muted-foreground"} />
+                      <span className={`text-xs font-bold ${battle.exclusive ? "text-amber-400" : ""}`}>{battle.case_count}</span>
                     </div>
                     {isOwn ? (
                       <NextLink href={`/battles/${battle.id}`}>
@@ -285,7 +320,7 @@ export default function BattlesPage() {
                         className="h-7 px-3 text-xs"
                         onClick={() => joinBattle(battle.id)}
                         disabled={!canJoin || joining === battle.id}
-                        title={!canJoin ? `Need ${battle.case_count} cases to join` : undefined}
+                        title={!canJoin ? `Need ${joinCost} cases to join` : undefined}
                       >
                         {joining === battle.id
                           ? <Loader2 size={11} className="animate-spin" />

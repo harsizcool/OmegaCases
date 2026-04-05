@@ -74,7 +74,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "User not found" }, { status: 404 })
   }
 
-  if ((joiner.cases_remaining ?? 0) < battle.case_count) {
+  const caseCost = battle.case_count * (battle.exclusive ? 50 : 1)
+
+  if ((joiner.cases_remaining ?? 0) < caseCost) {
     await db.from("battles").update({ joiner_id: null, status: "waiting" }).eq("id", id)
     return NextResponse.json({ error: "Not enough cases" }, { status: 402 })
   }
@@ -82,14 +84,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Deduct cases from joiner
   await db
     .from("users")
-    .update({ cases_remaining: joiner.cases_remaining - battle.case_count })
+    .update({ cases_remaining: joiner.cases_remaining - caseCost })
     .eq("id", joiner_id)
 
-  // Fetch items for rolling
-  const { data: items } = await db
-    .from("items")
-    .select("id, likelihood, market_price")
-    .eq("limited_time", false)
+  // Fetch items for rolling — Exclusives mode restricts to Legendary & Omega only
+  const itemsQuery = db.from("items").select("id, likelihood, market_price").eq("limited_time", false)
+  const { data: items } = battle.exclusive
+    ? await itemsQuery.in("rarity", ["Legendary", "Omega"])
+    : await itemsQuery
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "No items available" }, { status: 500 })
