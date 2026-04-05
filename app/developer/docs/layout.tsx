@@ -9,6 +9,7 @@ const SECTIONS = [
   { id: "oauth",    label: "OAuth" },
   { id: "tokens",   label: "Tokens" },
   { id: "spend",    label: "Spend Balance" },
+  { id: "cases",    label: "Open Cases" },
   { id: "public",   label: "Public API" },
 ]
 

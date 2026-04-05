@@ -111,6 +111,7 @@ function Overview() {
       <div className="border border-border rounded-xl overflow-hidden">
         <Row method="GET"  path="/api/oauth/me?token=xxx"        desc="Fetch authorized user info" />
         <Row method="POST" path="/api/oauth/spend"               desc="Spend balance on behalf of user" />
+        <Row method="POST" path="/api/oauth/cases/open"           desc="Open a case on behalf of user" />
         <Row method="GET"  path="/api/admin/items"               desc="All items (public)" />
         <Row method="GET"  path="/api/rolls?limit=50"            desc="Recent rolls (public)" />
         <Row method="GET"  path="/api/leaderboard"               desc="Leaderboard (public)" />
@@ -354,6 +355,77 @@ function PublicDocs() {
   )
 }
 
+function CasesDocs() {
+  return (
+    <>
+      <H1>Open Cases</H1>
+      <Desc>Open cases on behalf of an authorized user using their token. Each spin is provably fair with HMAC-SHA256.</Desc>
+
+      <Card>
+        <CardHead>POST /api/oauth/cases/open</CardHead>
+        <CardBody>
+          <Block lang="js" label="Request">{`fetch("${BASE}/api/oauth/cases/open", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    token:       "user_token_here",
+    client_seed: "optional-custom-seed"  // defaults to "omegacases"
+  })
+})`}
+          </Block>
+          <Block lang="response" label="Success response">{`{
+  "wonItem": {
+    "id":           "uuid",
+    "name":         "Dragon Claw",
+    "image_url":    "https://...",
+    "rarity":       "Legendary",
+    "rap":          45.00,
+    "market_price": 49.99
+  },
+  "cases_remaining":  12,
+  "server_seed_hash": "sha256 hash shown before spin",
+  "server_seed":      "revealed seed for verification",
+  "client_seed":      "optional-custom-seed",
+  "nonce":            0,
+  "float":            0.4821903467
+}`}
+          </Block>
+          <Block lang="response" label="Error responses">{`{ "error": "Invalid or revoked token" }              // 401
+{ "error": "Token does not have write_cases scope" }  // 403
+{ "error": "No cases remaining" }                     // 402`}
+          </Block>
+        </CardBody>
+      </Card>
+
+      <H2>Provably fair</H2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Every spin uses <strong>HMAC-SHA256</strong> with a server seed and client seed. You can verify any roll independently.
+      </p>
+      <div className="border border-border rounded-xl overflow-hidden mb-4">
+        {[
+          ["Algorithm",        "HMAC-SHA256(serverSeed, clientSeed:nonce:0) → first 8 hex chars as uint32 / 0x100000000"],
+          ["server_seed_hash", "SHA-256 of the server seed — commit shown before rolling"],
+          ["server_seed",      "Revealed in the response so the roll can be independently verified"],
+          ["client_seed",      "Your input — defaults to 'omegacases', override per request"],
+          ["Verify endpoint",  "GET /api/rolls/verify?id=roll_id — recomputes and confirms integrity"],
+        ].map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[160px_1fr] px-4 py-2.5 border-b border-border/40 last:border-0 items-start">
+            <span className="text-xs font-semibold">{k}</span>
+            <span className="text-xs text-muted-foreground font-mono">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      <Block lang="js" label="Verify a roll yourself">{`const hmac = createHmac("sha256", server_seed)
+hmac.update(\`\${client_seed}:\${nonce}:0\`)
+const hex   = hmac.digest("hex")
+const float = parseInt(hex.slice(0, 8), 16) / 0x100000000
+// float should match the float in the response`}
+      </Block>
+    </>
+  )
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 const PAGES: Record<string, React.FC> = {
@@ -361,6 +433,7 @@ const PAGES: Record<string, React.FC> = {
   oauth:    OAuthDocs,
   tokens:   TokensDocs,
   spend:    SpendDocs,
+  cases:    CasesDocs,
   public:   PublicDocs,
 }
 
