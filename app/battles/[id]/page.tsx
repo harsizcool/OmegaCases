@@ -7,6 +7,7 @@ import { Swords, Trophy, Copy, Loader2, Crown, ArrowLeft, X } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
+import { useMuteSounds } from "@/lib/use-mute-sounds"
 import { createClient } from "@/lib/supabase/client"
 import { RARITY_COLORS } from "@/lib/types"
 import BattleSpinner, { type SpinItem } from "@/components/battle-spinner"
@@ -134,6 +135,7 @@ function PlayerHeader({ player, isWinner, rap }: { player: BattleUser | null; is
 export default function BattleRoomPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const { muted } = useMuteSounds()
 
   const [battle, setBattle] = useState<Battle | null>(null)
   const [allItems, setAllItems] = useState<SpinItem[]>([])
@@ -142,6 +144,9 @@ export default function BattleRoomPage() {
 
   const battleRef = useRef<Battle | null>(null)
   battleRef.current = battle
+
+  const mutedRef = useRef(muted)
+  mutedRef.current = muted
 
   const [spinningRound, setSpinningRound] = useState<number | null>(null)
   const [revealedRounds, setRevealedRounds] = useState<Set<number>>(new Set())
@@ -226,7 +231,7 @@ export default function BattleRoomPage() {
       const hasOmega = battleRef.current.rolls.some((r) => r.round === round && r.items.rarity === "Omega")
       if (hasOmega) {
         setConfettiActive(true)
-        playSound(CONFETTI_SRC)
+        if (!mutedRef.current) playSound(CONFETTI_SRC)
         setTimeout(() => setConfettiActive(false), 6000)
       }
     }
@@ -435,6 +440,7 @@ export default function BattleRoomPage() {
                   items={allItems}
                   targetItem={roll.items as SpinItem}
                   spinning={true}
+                  muted={muted}
                   onComplete={() => handleSpinComplete(round)}
                 />
               ) : isRevealed && roll ? (
