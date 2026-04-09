@@ -1,6 +1,6 @@
 # OmegaCases
 
-This is a [Next.js](https://nextjs.org) project bootstrapped
+ggs v1
 
 
 ## Getting Started
