@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { motion } from "motion/react"
 import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -338,13 +339,22 @@ export default function Navbar() {
                   key={href}
                   href={href}
                   className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon size={14} />
-                  {label}
+                  {active && (
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      className="absolute inset-0 rounded-md bg-primary/15"
+                      transition={{ type: "spring", stiffness: 380, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1.5">
+                    <Icon size={14} />
+                    {label}
+                  </span>
                   {badge !== null && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5 z-10">
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
