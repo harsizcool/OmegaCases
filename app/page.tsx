@@ -10,7 +10,6 @@ import {
   Trophy,
   Star,
   ChevronRight,
-  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -144,32 +143,6 @@ export default function HomePage() {
           </span>
         </div>
       </div>
-
-      {/* ── Exchange banner ──────────────────────────────── */}
-      <a
-        href="https://exchange.omegacases.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group border-y border-border/40 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 hover:from-emerald-500/10 hover:via-blue-500/10 hover:to-purple-500/10 transition-colors"
-      >
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400/20 to-blue-500/20 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <span className="text-sm">🔄</span>
-            </div>
-            <div>
-              <p className="text-sm font-bold">
-                <span className="exchange-shimmer-text">OmegaExchange</span>
-                {" "}<span className="text-muted-foreground font-normal">— P2P Crypto Exchange</span>
-              </p>
-              <p className="text-xs text-muted-foreground">Buy &amp; sell crypto peer-to-peer, safely and instantly.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-xs font-bold text-emerald-400 shrink-0 group-hover:gap-2 transition-all">
-            Visit <ArrowUpRight size={13} />
-          </div>
-        </div>
-      </a>
 
       {/* ── CTA strip ────────────────────────────────────── */}
       {!user && (
