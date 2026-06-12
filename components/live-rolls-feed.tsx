@@ -128,7 +128,7 @@ export default function LiveRollsFeed() {
               <div
                 key={roll.id}
                 className="flex items-center gap-2 px-3 py-1.5 border-b border-border hover:bg-accent transition-colors"
-                style={{ borderLeft: `3px solid ${color}` }}
+                style={{ backgroundColor: color + "0a" }}
               >
                 <img
                   src={roll.image_url ?? "/placeholder.svg?width=32&height=32"}
@@ -191,7 +191,6 @@ export default function LiveRollsFeed() {
                 className="flex items-center gap-1 shrink-0 rounded px-1.5 py-0.5"
                 style={{
                   border: `1px solid ${color}44`,
-                  borderLeft: `3px solid ${color}`,
                   backgroundColor: color + "11",
                 }}
               >

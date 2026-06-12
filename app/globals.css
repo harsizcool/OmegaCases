@@ -119,6 +119,14 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @keyframes exchange-shimmer {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
@@ -146,5 +154,11 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-variation-settings: "CRSV" 0;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
 }
