@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 const NOWPAYMENTS_API = "https://api.nowpayments.io/v1"
-const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1482463519625445551/4O9juWv4hZGMZjk5DUxCL8RxgtGPZ_UUrY7G2qj0g-55324-cdC_UsHn5aomBW2gL-Sg"
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL!
 
 async function notifyDiscord(content: string, fields?: { name: string; value: string; inline?: boolean }[]) {
   try {
