@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Cpu, Code2, Swords, ChevronDown, ArrowUpRight } from "lucide-react"
+import { motion } from "motion/react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown, Sparkles, Cpu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -25,8 +26,8 @@ import NotificationBell from "./notification-bell"
 const NAV_LINKS = [
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
+  { href: "/mining",      label: "Mining",      icon: Cpu },
   { href: "/chat",        label: "Chat",        icon: MessageSquare },
-  { href: "/mine",        label: "Mining",      icon: Cpu },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ]
 
@@ -339,13 +340,22 @@ export default function Navbar() {
                   key={href}
                   href={href}
                   className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon size={14} />
-                  {label}
+                  {active && (
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      className="absolute inset-0 rounded-md bg-primary/15"
+                      transition={{ type: "spring", stiffness: 380, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1.5">
+                    <Icon size={14} />
+                    {label}
+                  </span>
                   {badge !== null && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] bg-destructive text-white text-[0.55rem] font-bold rounded-full flex items-center justify-center px-0.5 z-10">
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
@@ -360,15 +370,6 @@ export default function Navbar() {
             >
               <Crown size={14} /> Plus
             </NextLink>
-            <a
-              href="https://exchange.omegacases.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm font-bold transition-colors hover:bg-muted"
-            >
-              <span className="exchange-shimmer-text">Exchange</span>
-              <ArrowUpRight size={11} className="text-emerald-400 shrink-0" />
-            </a>
           </nav>
 
           {/* Search — grows to fill center space */}
@@ -379,12 +380,21 @@ export default function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-1.5 ml-auto shrink-0">
             {mounted && user && (
-              <button
-                onClick={() => setDepositOpen(true)}
-                className="flex text-xs font-bold text-primary bg-primary/10 border border-primary/25 rounded-lg px-2.5 py-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap"
-              >
-                ${Number(user.balance).toFixed(2)}
-              </button>
+              <div className="flex items-center rounded-lg border border-primary/25 overflow-hidden shrink-0">
+                <button
+                  onClick={() => setDepositOpen(true)}
+                  className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap"
+                >
+                  ${Number(user.balance).toFixed(2)}
+                </button>
+                <div className="w-px self-stretch bg-primary/25" />
+                <NextLink
+                  href="/zites"
+                  className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1.5 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                >
+                  <Sparkles size={12} /> {Number(user.zites_balance).toFixed(2)}
+                </NextLink>
+              </div>
             )}
 
             {mounted && (
@@ -467,9 +477,14 @@ export default function Navbar() {
                       </Avatar>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold truncate">{user.username}</p>
-                        <button onClick={() => { setMobileOpen(false); setDepositOpen(true) }} className="text-xs text-primary font-semibold">
-                          ${Number(user.balance).toFixed(2)}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => { setMobileOpen(false); setDepositOpen(true) }} className="text-xs text-primary font-semibold">
+                            ${Number(user.balance).toFixed(2)}
+                          </button>
+                          <NextLink href="/zites" onClick={() => setMobileOpen(false)} className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
+                            <Sparkles size={11} /> {Number(user.zites_balance).toFixed(2)}
+                          </NextLink>
+                        </div>
                       </div>
                       {onlineCount > 0 && (
                         <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/25 rounded-full px-2 py-0.5 shrink-0">
@@ -542,16 +557,6 @@ export default function Navbar() {
                   <NextLink href="/plus" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-amber-400 hover:bg-amber-500/10 transition-colors">
                     <Crown size={15} /> Plus
                   </NextLink>
-                  <a
-                    href="https://exchange.omegacases.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold hover:bg-muted transition-colors"
-                  >
-                    <ArrowUpRight size={15} className="text-emerald-400 shrink-0" />
-                    <span className="exchange-shimmer-text">Exchange</span>
-                  </a>
                 </nav>
 
                 {mounted && user && (
@@ -564,7 +569,7 @@ export default function Navbar() {
                       <NextLink href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                         <Settings size={15} /> Settings
                       </NextLink>
-                      <NextLink href="/developer" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                          <NextLink href="/developer" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                         <Code2 size={15} /> Developer
                       </NextLink>
                       {user.admin && (

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { motion, AnimatePresence } from "motion/react"
 import { createClient } from "@/lib/supabase/client"
 
 const RARITY_COLORS: Record<string, string> = {
@@ -122,44 +123,51 @@ export default function LiveRollsFeed() {
           {rolls.length === 0 && (
             <p className="text-[0.7rem] text-muted-foreground p-4 text-center">No rolls yet — open some cases!</p>
           )}
-          {rolls.map((roll) => {
-            const color = RARITY_COLORS[roll.rarity] ?? "#9e9e9e"
-            return (
-              <div
-                key={roll.id}
-                className="flex items-center gap-2 px-3 py-1.5 border-b border-border hover:bg-accent transition-colors"
-                style={{ borderLeft: `3px solid ${color}` }}
-              >
-                <img
-                  src={roll.image_url ?? "/placeholder.svg?width=32&height=32"}
-                  alt={roll.item_name}
-                  className="w-8 h-8 object-contain shrink-0 rounded"
-                />
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="block text-[0.65rem] font-bold overflow-hidden text-ellipsis whitespace-nowrap leading-snug"
-                    style={{ color }}
-                  >
-                    {roll.item_name}
-                  </span>
-                  <span className="block text-[0.6rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-                    {roll.username}
-                  </span>
-                  <span
-                    className="text-[0.55rem] font-semibold px-1 py-px rounded-full mt-0.5 inline-block"
-                    style={{ backgroundColor: color + "22", color }}
-                  >
-                    {roll.rarity}
-                  </span>
-                </div>
-                {roll.rap > 0 && (
-                  <span className="text-[0.6rem] font-bold shrink-0 whitespace-nowrap" style={{ color }}>
-                    ${Number(roll.rap).toFixed(0)}
-                  </span>
-                )}
-              </div>
-            )
-          })}
+          <AnimatePresence initial={false}>
+            {rolls.map((roll) => {
+              const color = RARITY_COLORS[roll.rarity] ?? "#9e9e9e"
+              return (
+                <motion.div
+                  key={roll.id}
+                  layout
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -16 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                  className="flex items-center gap-2 px-3 py-1.5 border-b border-border hover:bg-accent transition-colors"
+                  style={{ backgroundColor: color + "0a" }}
+                >
+                  <img
+                    src={roll.image_url ?? "/placeholder.svg?width=32&height=32"}
+                    alt={roll.item_name}
+                    className="w-8 h-8 object-contain shrink-0 rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className="block text-[0.65rem] font-bold overflow-hidden text-ellipsis whitespace-nowrap leading-snug"
+                      style={{ color }}
+                    >
+                      {roll.item_name}
+                    </span>
+                    <span className="block text-[0.6rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                      {roll.username}
+                    </span>
+                    <span
+                      className="text-[0.55rem] font-semibold px-1 py-px rounded-full mt-0.5 inline-block"
+                      style={{ backgroundColor: color + "22", color }}
+                    >
+                      {roll.rarity}
+                    </span>
+                  </div>
+                  {roll.rap > 0 && (
+                    <span className="text-[0.6rem] font-bold shrink-0 whitespace-nowrap" style={{ color }}>
+                      ${Number(roll.rap).toFixed(0)}
+                    </span>
+                  )}
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -191,7 +199,6 @@ export default function LiveRollsFeed() {
                 className="flex items-center gap-1 shrink-0 rounded px-1.5 py-0.5"
                 style={{
                   border: `1px solid ${color}44`,
-                  borderLeft: `3px solid ${color}`,
                   backgroundColor: color + "11",
                 }}
               >

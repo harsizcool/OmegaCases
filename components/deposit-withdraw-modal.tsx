@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { Lock, Copy, QrCode, Gift, Crown, Loader2, ArrowUpRight } from "lucide-react"
+import { Lock, Copy, QrCode, Gift, Crown, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -229,7 +229,6 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
           <TabsList className="w-full">
             <TabsTrigger value="deposit" className="flex-1">Deposit</TabsTrigger>
             <TabsTrigger value="withdraw" className="flex-1">Withdraw</TabsTrigger>
-            <TabsTrigger value="buy-crypto" className="flex-1 text-xs">Buy Crypto</TabsTrigger>
           </TabsList>
 
           {/* DEPOSIT */}
@@ -525,40 +524,6 @@ export default function DepositWithdrawModal({ open, onClose }: Props) {
                 </Button>
               </>
             )}
-          </TabsContent>
-          {/* BUY CRYPTO */}
-          <TabsContent value="buy-crypto" className="flex flex-col gap-4 mt-4">
-            <div className="rounded-xl overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-blue-500/5 to-purple-500/5">
-              <div className="px-4 pt-4 pb-3">
-                <p className="text-[0.6rem] font-bold uppercase tracking-widest text-emerald-400 mb-1">Our Sister Platform</p>
-                <h3 className="text-base font-bold mb-1">
-                  <span className="exchange-shimmer-text">OmegaExchange</span>
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  A peer-to-peer crypto marketplace — buy and sell Bitcoin, Litecoin, Solana, and more directly with other users. No middlemen, competitive rates, and instant escrow protection.
-                </p>
-              </div>
-              <div className="px-4 pb-4 flex flex-col gap-2.5">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {["BTC", "LTC", "SOL", "BCH"].map((c) => (
-                    <div key={c} className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2 border border-border/40">
-                      <img src={CRYPTO_LOGOS[c]} alt={c} className="w-4 h-4 object-contain shrink-0" />
-                      <span className="font-semibold">{c}</span>
-                    </div>
-                  ))}
-                </div>
-                <a
-                  href="https://exchange.omegacases.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg font-bold text-sm bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 hover:from-emerald-500/30 hover:to-blue-500/30 transition-colors"
-                >
-                  <span className="exchange-shimmer-text">Go to OmegaExchange</span>
-                  <ArrowUpRight size={14} className="text-emerald-400 shrink-0" />
-                </a>
-                <p className="text-[0.65rem] text-muted-foreground text-center">Opens in a new tab · P2P · No KYC</p>
-              </div>
-            </div>
           </TabsContent>
         </Tabs>
 

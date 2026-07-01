@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "2.1.0",
+  "version": "2.0.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@netlify/functions": "^2.8.2",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -49,6 +50,7 @@
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "lucide-react": "^0.564.0",
+    "motion": "^12.40.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
     "qrcode.react": "^4.2.0",
@@ -64,6 +66,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.9.4",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",

@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+let cachedResult: { data: unknown; expiresAt: number } | null = null
+
 export async function GET() {
+  const now = Date.now()
+
+  if (cachedResult && now < cachedResult.expiresAt) {
+    return NextResponse.json(cachedResult.data, {
+      headers: { "X-Cache": "HIT" },
+    })
+  }
+
   const db = await createClient()
 
-  // For each user, fetch their full inventory the same way the inventory page does:
-  // select all inventory rows with the joined item data, then sum rap per user
   const { data: users } = await db
     .from("users")
     .select("id, username, profile_picture, plus")
@@ -52,5 +62,9 @@ export async function GET() {
     .sort((a, b) => b.rap - a.rap)
     .slice(0, 10)
 
-  return NextResponse.json(leaderboard)
+  cachedResult = { data: leaderboard, expiresAt: now + CACHE_TTL_MS }
+
+  return NextResponse.json(leaderboard, {
+    headers: { "X-Cache": "MISS" },
+  })
 }

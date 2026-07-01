@@ -561,6 +561,186 @@ const float = parseInt(hex.slice(0, 8), 16) / 0x100000000
   )
 }
 
+function MiningPoolsDocs() {
+  return (
+    <>
+      <H1>Creating your own OmegaCases Mining Pool</H1>
+      <Desc>
+        A mining pool lets many miners combine hashpower and split OmegaZites rewards proportionally to
+        the shares they contribute. You do not need much custom code to run one. OmegaCases handles
+        listing, uptime checks, the join flow, and splitting the reward, all automatically.
+      </Desc>
+
+      <Card>
+        <CardHead>What you actually need to build</CardHead>
+        <CardBody>
+          <p className="text-sm text-muted-foreground mb-3">
+            Only two things are required from you as the pool operator.
+          </p>
+          <div className="border border-border rounded-xl overflow-hidden mb-2">
+            {[
+              ["1. Answer PING with PONG", "Something listening on the port you register, that replies with the text PONG when it receives PING. This can be a few lines in almost any language."],
+              ["2. Accept miners and report blocks", "Your own logic for accepting miner connections, tracking their shares (PPLNS, proportional, or anything you like), and calling the submit-block endpoint whenever you solve a block."],
+            ].map(([k, v]) => (
+              <div key={k} className="grid grid-cols-[220px_1fr] px-4 py-2.5 border-b border-border/40 last:border-0 items-start">
+                <span className="text-xs font-semibold">{k}</span>
+                <span className="text-xs text-muted-foreground">{v}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Everything else, listing your pool publicly, checking that it is still online, letting users
+            join, and splitting the OmegaZites reward across participants, is handled by OmegaCases for you.
+          </p>
+        </CardBody>
+      </Card>
+
+      <H2>Prerequisites</H2>
+      <p className="text-sm text-muted-foreground mb-6">
+        You need a VPS or a machine you control (even a home computer works) with a public IPv4 or IPv6
+        address and an open port that miners and OmegaCases can reach. You can create an unlimited
+        number of pools.
+      </p>
+
+      <Card>
+        <CardHead>POST /api/mining/pools (register a pool)</CardHead>
+        <CardBody>
+          <Block lang="js" label="Request">{`fetch("${BASE}/api/mining/pools", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    owner_id:    "your-user-id",
+    name:        "My Pool",
+    host:        "203.0.113.10",
+    port:        3333,
+    ip_version:  "auto",       // "ipv4", "ipv6", or "auto"
+    description: "Low fee pool, PPLNS payouts"
+  })
+})`}
+          </Block>
+          <Block lang="response" label="Response">{`{
+  "success": true,
+  "pool":    { "id": "pool-uuid", "status": "testing", ... },
+  "api_key": "a3f9c2...",
+  "warning": "Save this API key now, it will not be shown again."
+}`}
+          </Block>
+          <Warn>
+            <strong>Save the api_key immediately.</strong> It is shown once and is required to authenticate
+            every future call your pool makes to OmegaCases.
+          </Warn>
+        </CardBody>
+      </Card>
+
+      <H2>Authenticating pool API calls</H2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Calls your pool makes to OmegaCases (like submitting a found block) are authenticated with your
+        API key, not a normal user session, since your pool is an unattended server rather than a logged
+        in browser. Send it as a bearer token.
+      </p>
+      <Block lang="js" label="Authorization header">{`Authorization: Bearer a3f9c2...`}
+      </Block>
+
+      <H2>The 30 second liveness check</H2>
+      <p className="text-sm text-muted-foreground mb-4">
+        After you register, OmegaCases's own server starts connecting to the host and port you gave it.
+        It sends a short message, <Code>PING</Code>, and expects <Code>PONG</Code> back. This repeats for
+        about 30 seconds. If enough of those checks succeed, your pool's status changes from
+        <Code>testing</Code> to <Code>active</Code> and it appears on the public pool list at
+        <Code>/mining</Code>. If it fails, your pool goes back to <Code>pending</Code> and you can fix
+        whatever is blocking the connection (a firewall rule, for example) and try again by editing the
+        pool, which restarts the check.
+      </p>
+
+      <H2>Ongoing uptime checks</H2>
+      <p className="text-sm text-muted-foreground mb-6">
+        OmegaCases keeps re-checking active pools the same way, roughly every few minutes, for as long as
+        you are listed. A pool that stops answering PING for several checks in a row gets marked
+        offline until it responds again. You do not need to call anything yourself for this, OmegaCases
+        always initiates the check.
+      </p>
+
+      <Card>
+        <CardHead>POST /api/mining/pools/{"{id}"}/submit-block (report a found block)</CardHead>
+        <CardBody>
+          <p className="text-sm text-muted-foreground mb-3">
+            Call this when your pool solves a block. Include the winning nonce and hash, plus the shares
+            each participant contributed for that round.
+          </p>
+          <Block lang="js" label="Request">{`fetch("${BASE}/api/mining/pools/{id}/submit-block", {
+  method: "POST",
+  headers: {
+    "Content-Type":  "application/json",
+    "Authorization": "Bearer a3f9c2..."
+  },
+  body: JSON.stringify({
+    nonce: 918234,
+    hash:  "0000abc...",
+    shares: [
+      { "user_id": "uuid-of-participant",       "shares": 1500 },
+      { "user_id": "uuid-of-another-participant", "shares": 800 }
+    ]
+  })
+})`}
+          </Block>
+          <Block lang="response" label="Response">{`{
+  "success": true,
+  "block":   { "height": 1234, "reward_zites": 64 },
+  "payouts": [
+    { "user_id": "...", "shares": 1500, "zites_credited": 41.7391 },
+    { "user_id": "...", "shares": 800,  "zites_credited": 22.2609 }
+  ]
+}`}
+          </Block>
+          <Warn>
+            The proof of work preimage for a pool block is <Code>previous_hash + pool_id_no_dashes + nonce</Code>,
+            using your pool's own id in place of an individual miner's id, since many people contribute to
+            one pool block. This differs from solo mining, where the miner's own user id is used instead.
+          </Warn>
+          <p className="text-xs text-muted-foreground">
+            Any <Code>user_id</Code> in the shares list that has not joined your pool through the site first
+            is ignored. Users join from your pool's page by pressing Join Pool.
+          </p>
+        </CardBody>
+      </Card>
+
+      <H2>PPLNS and payout logic is your responsibility</H2>
+      <p className="text-sm text-muted-foreground mb-6">
+        OmegaCases does not care how you decide share weights internally, whether that is PPLNS, PPS,
+        simple proportional, or anything else. It only takes the shares list you submit at block-found
+        time and splits that block's OmegaZites reward proportionally among those numbers. All internal
+        accounting, minimum payout thresholds, and fairness between your own miners is entirely up to you.
+      </p>
+
+      <H2>Getting listed and letting users join</H2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Once active, your pool appears on <Code>/mining</Code> showing its uptime, blocks found, and
+        member count so prospective miners can evaluate it before joining. When a user presses Join Pool,
+        OmegaCases simply records them as a participant, so the site can show that they are a member and
+        so your <Code>submit-block</Code> calls can credit their <Code>user_id</Code>. The user still
+        needs to separately configure their own mining software with your pool's host and port to actually
+        start contributing hashpower, joining on the site does not connect them to your server for you.
+      </p>
+
+      <H2>Endpoints at a glance</H2>
+      <div className="border border-border rounded-xl overflow-hidden mb-4">
+        <Row method="POST" path="/api/mining/pools"                    desc="Register a new pool, returns a one time API key" />
+        <Row method="GET"  path="/api/mining/pools"                    desc="Public list of active pools" />
+        <Row method="GET"  path="/api/mining/pools/{id}"                desc="Pool detail, stats, and recent blocks" />
+        <Row method="PATCH" path="/api/mining/pools/{id}"               desc="Owner edits, host or port changes re-run the liveness check" />
+        <Row method="POST" path="/api/mining/pools/{id}/join"           desc="Join a pool as a declared participant" />
+        <Row method="DELETE" path="/api/mining/pools/{id}/join"         desc="Leave a pool" />
+        <Row method="POST" path="/api/mining/pools/{id}/submit-block"   desc="Report a found block and the shares to split its reward" />
+      </div>
+
+      <Warn>
+        Treat your pool's API key like a password. Anyone with it can submit blocks and shares on your
+        pool's behalf.
+      </Warn>
+    </>
+  )
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 const PAGES: Record<string, React.FC> = {
@@ -572,6 +752,7 @@ const PAGES: Record<string, React.FC> = {
   listings: ListingsDocs,
   notify:   NotifyDocs,
   public:   PublicDocs,
+  "mining-pools": MiningPoolsDocs,
 }
 
 export default function DocsSection() {

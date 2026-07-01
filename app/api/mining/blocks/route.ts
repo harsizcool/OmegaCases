@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   if (heightParam !== null) {
     const { data, error } = await db
       .from("mining_blocks")
-      .select("*, users(id, username, profile_picture, plus)")
+      .select("*, users(id, username, profile_picture, plus), mining_pools(id, name)")
       .eq("height", parseInt(heightParam, 10))
       .single()
     if (error || !data) return NextResponse.json({ error: "Block not found" }, { status: 404 })
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await db
     .from("mining_blocks")
-    .select("*, users(id, username, profile_picture, plus)", { count: "exact" })
+    .select("*, users(id, username, profile_picture, plus), mining_pools(id, name)", { count: "exact" })
     .order("height", { ascending: false })
     .range(from, to)
 

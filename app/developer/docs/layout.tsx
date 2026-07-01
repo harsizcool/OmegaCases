@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: "listings", label: "Buy Listings" },
   { id: "notify",   label: "Notifications" },
   { id: "public",   label: "Public API" },
+  { id: "mining-pools", label: "Mining Pools" },
 ]
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
