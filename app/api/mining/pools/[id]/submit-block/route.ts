@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { authenticatePool } from "@/lib/pool-auth"
 import {
   DEFAULT_TARGET,
+  claimMiningBlock,
+  creditZitesBalance,
   getSetting,
   maybeRetargetDifficulty,
   normalizeTarget,
-  setSetting,
   verifyProofOfWork,
   zitesRewardAtHeight,
 } from "@/lib/mining"
@@ -76,38 +77,41 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const reward = zitesRewardAtHeight(currentHeight)
 
-  const { data: block, error: insertError } = await db
-    .from("mining_blocks")
-    .insert({
-      height: currentHeight,
-      hash: hash.toLowerCase(),
-      nonce: Number(nonce),
-      miner_id: pool.owner_id,
-      previous_hash: previousHash,
-      target: currentTarget,
-      reward_zites: reward,
-      pool_id: poolId,
-      found_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
+  const claim = await claimMiningBlock(db, {
+    expectedHeight: currentHeight,
+    hash,
+    nonce,
+    minerId: pool.owner_id,
+    previousHash,
+    target: currentTarget,
+    rewardZites: reward,
+    poolId,
+  })
 
-  if (insertError || !block) {
+  if ("collision" in claim) {
     return NextResponse.json({ error: "Block already claimed — a faster miner beat you to it" }, { status: 409 })
   }
+  const { newHeight, blockId } = claim
 
   // Split the reward proportionally to reported shares among valid participants.
+  // Track cumulative credited amount so the last participant absorbs any rounding
+  // remainder instead of every share independently rounding and over/under-paying
+  // the total block reward.
   const totalShares = validShares.reduce((sum, s) => sum + s.shares, 0)
   const payouts: { user_id: string; shares: number; zites_credited: number }[] = []
+  let creditedSoFar = 0
 
-  for (const s of validShares) {
-    const zitesCredited = totalShares > 0 ? reward * (s.shares / totalShares) : 0
-    const { data: participant } = await db.from("users").select("zites_balance").eq("id", s.user_id).single()
-    if (!participant) continue
+  for (let i = 0; i < validShares.length; i++) {
+    const s = validShares[i]
+    const isLast = i === validShares.length - 1
+    const zitesCredited = totalShares > 0
+      ? (isLast ? Number((reward - creditedSoFar).toFixed(4)) : Number((reward * (s.shares / totalShares)).toFixed(4)))
+      : 0
+    creditedSoFar += zitesCredited
 
-    await db.from("users").update({ zites_balance: Number(participant.zites_balance) + zitesCredited }).eq("id", s.user_id)
+    await creditZitesBalance(db, s.user_id, zitesCredited)
     await db.from("mining_pool_shares").insert({
-      block_id: block.id,
+      block_id: blockId,
       pool_id: poolId,
       user_id: s.user_id,
       shares: s.shares,
@@ -132,9 +136,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     link: `/mining/pools/${poolId}`,
   })
 
-  // Advance height and run the shared difficulty retarget, same as solo blocks.
-  const newHeight = currentHeight + 1
-  await setSetting(db, "mining_height", String(newHeight))
+  // Height was already advanced atomically inside claimMiningBlock; run the
+  // shared difficulty retarget, same as solo blocks.
   const newTarget = await maybeRetargetDifficulty(db, currentTarget, newHeight)
 
   return NextResponse.json({
