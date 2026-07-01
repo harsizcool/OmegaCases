@@ -1,6 +1,6 @@
 # OmegaCases
 
-Starting from today, this has become the official repository regarding OmegaCases contributions from the public.
+
 
 This means that PRs are accepted, Issues are accepted aswell.
 
