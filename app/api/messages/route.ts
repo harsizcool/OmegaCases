@@ -35,9 +35,6 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ messages: (data ?? []).reverse() })
   }
-
-
-  
   // DM history between two users
   if (!user_id || !with_user)
     return NextResponse.json({ error: "Missing user_id or with" }, { status: 400 })
