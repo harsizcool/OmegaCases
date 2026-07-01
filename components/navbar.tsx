@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { motion } from "motion/react"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown } from "lucide-react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown, Sparkles, Cpu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -26,6 +26,7 @@ import NotificationBell from "./notification-bell"
 const NAV_LINKS = [
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/trade",       label: "Trade",       icon: ArrowLeftRight },
+  { href: "/mining",      label: "Mining",      icon: Cpu },
   { href: "/chat",        label: "Chat",        icon: MessageSquare },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ]
@@ -379,12 +380,21 @@ export default function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-1.5 ml-auto shrink-0">
             {mounted && user && (
-              <button
-                onClick={() => setDepositOpen(true)}
-                className="flex text-xs font-bold text-primary bg-primary/10 border border-primary/25 rounded-lg px-2.5 py-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap"
-              >
-                ${Number(user.balance).toFixed(2)}
-              </button>
+              <div className="flex items-center rounded-lg border border-primary/25 overflow-hidden shrink-0">
+                <button
+                  onClick={() => setDepositOpen(true)}
+                  className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap"
+                >
+                  ${Number(user.balance).toFixed(2)}
+                </button>
+                <div className="w-px self-stretch bg-primary/25" />
+                <NextLink
+                  href="/zites"
+                  className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1.5 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                >
+                  <Sparkles size={12} /> {Number(user.zites_balance).toFixed(2)}
+                </NextLink>
+              </div>
             )}
 
             {mounted && (
@@ -467,9 +477,14 @@ export default function Navbar() {
                       </Avatar>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold truncate">{user.username}</p>
-                        <button onClick={() => { setMobileOpen(false); setDepositOpen(true) }} className="text-xs text-primary font-semibold">
-                          ${Number(user.balance).toFixed(2)}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => { setMobileOpen(false); setDepositOpen(true) }} className="text-xs text-primary font-semibold">
+                            ${Number(user.balance).toFixed(2)}
+                          </button>
+                          <NextLink href="/zites" onClick={() => setMobileOpen(false)} className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
+                            <Sparkles size={11} /> {Number(user.zites_balance).toFixed(2)}
+                          </NextLink>
+                        </div>
                       </div>
                       {onlineCount > 0 && (
                         <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/25 rounded-full px-2 py-0.5 shrink-0">

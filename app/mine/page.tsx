@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Monitor, Smartphone, Download, Cpu, Hash, Clock, Coins, TrendingDown, TrendingUp, Zap, ChevronRight, RefreshCw, Copy, Check } from "lucide-react"
+import { Monitor, Smartphone, Download, Cpu, Hash, Clock, TrendingDown, TrendingUp, Zap, ChevronRight, RefreshCw, Copy, Check } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { ZitesIcon } from "@/components/zites-icon"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -23,7 +24,8 @@ interface MiningBlock {
   miner_id: string
   previous_hash: string
   target: string
-  reward: number
+  reward_zites: number
+  pool_id: string | null
   found_at: string
   users: {
     id: string
@@ -31,14 +33,15 @@ interface MiningBlock {
     profile_picture: string | null
     plus: boolean
   }
+  mining_pools?: { id: string; name: string } | null
 }
 
 interface MiningInfo {
   target: string
   height: number
   previous_hash: string
-  reward: number
-  halving: {
+  reward_zites: number
+  zites_halving: {
     next_height: number
     blocks_remaining: number
     eta_ms: number
@@ -106,7 +109,9 @@ function BlockCard({ block, onClick }: { block: MiningBlock; onClick: () => void
           <span className="text-[0.7rem] font-mono font-bold text-muted-foreground">#{block.height}</span>
           <span className="text-[0.65rem] text-muted-foreground">{formatAge(block.found_at)}</span>
         </div>
-        <span className="text-xs font-bold text-green-400">+${Number(block.reward).toFixed(4)}</span>
+        <span className="text-xs font-bold text-amber-500 flex items-center gap-1">
+          <ZitesIcon size={11} /> +{Number(block.reward_zites).toFixed(4)}
+        </span>
       </div>
       <p className="text-[0.6rem] font-mono text-muted-foreground truncate mb-2">{block.hash}</p>
       <div className="flex items-center gap-1.5">
@@ -120,6 +125,9 @@ function BlockCard({ block, onClick }: { block: MiningBlock; onClick: () => void
           {block.users?.username ?? "Unknown"}
         </span>
         {block.users?.plus && <Badge className="text-[0.5rem] h-3.5 px-1 py-0">Plus</Badge>}
+        {block.mining_pools && (
+          <Badge variant="outline" className="text-[0.5rem] h-3.5 px-1 py-0">{block.mining_pools.name}</Badge>
+        )}
         <ChevronRight size={12} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />
       </div>
     </button>
@@ -205,7 +213,7 @@ export default function MinePage() {
   }, [fetchInfo])
 
   const halvingEtaMs = info
-    ? info.halving.eta_ms - (now - Date.now())  // static since we fetched
+    ? info.zites_halving.eta_ms - (now - Date.now())  // static since we fetched
     : null
 
   // Estimate time since last block for a "live timer" feel
@@ -237,15 +245,15 @@ export default function MinePage() {
             value: info ? `#${info.height.toLocaleString()}` : "—",
           },
           {
-            icon: <Coins size={14} className="text-green-400" />,
+            icon: <ZitesIcon size={14} />,
             label: "Block Reward",
-            value: info ? `$${Number(info.reward).toFixed(4)}` : "—",
+            value: info ? `${Number(info.reward_zites).toFixed(4)} Zites` : "—",
           },
           {
             icon: <Zap size={14} className="text-yellow-400" />,
             label: "Halving In",
-            value: info ? `${info.halving.blocks_remaining.toLocaleString()} blocks` : "—",
-            sub: info ? formatDuration(info.halving.eta_ms) : undefined,
+            value: info ? `${info.zites_halving.blocks_remaining.toLocaleString()} blocks` : "—",
+            sub: info ? formatDuration(info.zites_halving.eta_ms) : undefined,
           },
           {
             icon: <Clock size={14} className="text-blue-400" />,
@@ -333,7 +341,7 @@ export default function MinePage() {
                 <div className="flex justify-between text-muted-foreground">
                   <span>Halving in</span>
                   <span className="font-semibold text-foreground">
-                    {info ? `${info.halving.blocks_remaining} blocks` : "—"}
+                    {info ? `${info.zites_halving.blocks_remaining} blocks` : "—"}
                   </span>
                 </div>
               </div>
@@ -375,7 +383,7 @@ export default function MinePage() {
                         <CopyButton text={user.id} />
                       </div>
                       <p className="text-[0.65rem] text-muted-foreground">
-                        Your ID is pre-configured in the miner. Each valid block you find credits <span className="text-green-400 font-semibold">${Number(info?.reward ?? 0.12).toFixed(4)}</span> to your balance.
+                        Your ID is pre-configured in the miner. Each valid block you find credits <span className="text-amber-500 font-semibold">{Number(info?.reward_zites ?? 128).toFixed(4)} OmegaZites</span> to your balance.
                       </p>
                     </>
                   ) : (
@@ -393,8 +401,8 @@ export default function MinePage() {
                   <div className="text-[0.62rem] text-muted-foreground space-y-1">
                     <p>• Hash function: <span className="font-mono text-foreground">SHA256(prev_hash + user_id + nonce)</span></p>
                     <p>• Target block time: <span className="font-semibold text-foreground">6 minutes</span></p>
-                    <p>• Difficulty adjusts every <span className="font-semibold text-foreground">32 blocks</span></p>
-                    <p>• Reward halves every <span className="font-semibold text-foreground">64 blocks</span></p>
+                    <p>• Difficulty adjusts every <span className="font-semibold text-foreground">10 blocks</span></p>
+                    <p>• OmegaZites reward halves every <span className="font-semibold text-foreground">200 blocks</span></p>
                   </div>
                 </div>
               )}
@@ -428,7 +436,9 @@ export default function MinePage() {
                   </p>
                   <p className="text-xs text-muted-foreground">Miner</p>
                 </div>
-                <span className="ml-auto text-sm font-bold text-green-400">+${Number(selectedBlock.reward).toFixed(4)}</span>
+                <span className="ml-auto text-sm font-bold text-amber-500 flex items-center gap-1">
+                  <ZitesIcon size={13} /> +{Number(selectedBlock.reward_zites).toFixed(4)}
+                </span>
               </div>
 
               <Separator />
@@ -437,6 +447,7 @@ export default function MinePage() {
                 { label: "Block Height", value: `#${selectedBlock.height}` },
                 { label: "Found", value: new Date(selectedBlock.found_at).toLocaleString() },
                 { label: "Nonce", value: selectedBlock.nonce.toLocaleString() },
+                { label: "Source", value: selectedBlock.mining_pools ? `Pool: ${selectedBlock.mining_pools.name}` : "Solo" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-xs">
                   <span className="text-muted-foreground">{label}</span>

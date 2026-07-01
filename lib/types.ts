@@ -6,6 +6,7 @@ export interface User {
   password?: string
   profile_picture: string | null
   balance: number
+  zites_balance: number
   admin: boolean
   plus: boolean
   cases: number
@@ -129,4 +130,55 @@ export interface Conversation {
   last_message: string
   last_at: string
   unread: number
+}
+
+// ─── Zites ──────────────────────────────────────────────────────────────────
+
+export interface ZitesOrder {
+  id: string
+  user_id: string
+  side: "buy" | "sell"
+  order_type: "market" | "limit"
+  price: number | null
+  quantity: number
+  remaining_quantity: number
+  status: "open" | "partial" | "filled" | "cancelled"
+  created_at: string
+  updated_at: string
+}
+
+export interface ZitesTrade {
+  id: string
+  buy_order_id: string
+  sell_order_id: string
+  buyer_id: string
+  seller_id: string
+  price: number
+  quantity: number
+  executed_at: string
+}
+
+// ─── Mining pools ───────────────────────────────────────────────────────────
+
+export type MiningPoolStatus = "pending" | "testing" | "active" | "offline" | "banned"
+
+export interface MiningPool {
+  id: string
+  owner_id: string
+  name: string
+  host: string
+  port: number
+  ip_version: "ipv4" | "ipv6" | "auto"
+  description: string | null
+  status: MiningPoolStatus
+  api_key_prefix: string
+  last_heartbeat_at: string | null
+  uptime_pct_24h: number
+  uptime_pct_7d: number
+  total_shares_reported: number
+  blocks_found: number
+  member_count: number
+  banned_reason: string | null
+  created_at: string
+  updated_at: string
 }
