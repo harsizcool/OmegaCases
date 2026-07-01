@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  node_bundler = "esbuild"
+
+# pool-uptime-sweep is a scheduled function (see the schedule() wrapper in its
+# source), and pool-liveness-test-background is a Netlify background function
+# (the "-background" filename suffix is what makes it run async, up to 15
+# minutes, without blocking the caller). Neither needs an entry here beyond
+# being picked up from the functions directory above.

@@ -8,6 +8,10 @@ export type NotificationType =
   | "trade_cancelled"
   | "announcement"
   | "oauth_spend"
+  | "pool_activated"
+  | "pool_liveness_failed"
+  | "pool_offline"
+  | "pool_block_found"
 
 export async function createNotification({
   user_id,
