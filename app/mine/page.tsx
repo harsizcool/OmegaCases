@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import NextLink from "next/link"
 import { createClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Monitor, Smartphone, Download, Cpu, Hash, Clock, TrendingDown, TrendingUp, Zap, ChevronRight, RefreshCw, Copy, Check } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { ZitesIcon } from "@/components/zites-icon"
@@ -361,7 +363,7 @@ export default function MinePage() {
                 <div className="flex flex-col items-center gap-2 py-3 text-center">
                   <Smartphone size={28} className="text-muted-foreground opacity-50" />
                   <p className="text-xs text-muted-foreground">
-                    Mining is only available on desktop (requires Python with <code>tkinter</code>, <code>requests</code>, and <code>hashlib</code>).
+                    Mining is only available on desktop (Windows, macOS, or Linux).
                   </p>
                   <p className="text-xs text-muted-foreground">
                     You can still watch the live block explorer here.
@@ -372,20 +374,25 @@ export default function MinePage() {
                   <div className="flex items-start gap-2">
                     <Monitor size={15} className="text-primary mt-0.5 shrink-0" />
                     <p className="text-xs text-muted-foreground">
-                      Download the OmegaCases miner (Python app) to start earning blocks. Requires Python 3 with <code className="text-xs bg-muted px-1 rounded">tkinter</code>, <code className="text-xs bg-muted px-1 rounded">requests</code>, and <code className="text-xs bg-muted px-1 rounded">hashlib</code>.
+                      Download the OmegaCases GPU miner to start earning OmegaZites. It supports both <span className="text-foreground font-semibold">Solo Mining</span> (straight against OmegaCases) and <span className="text-foreground font-semibold">Pool Mining</span> (point it at a pool you've joined from <NextLink href="/mining" className="text-primary hover:underline">/mining</NextLink>).
                     </p>
                   </div>
 
                   {user ? (
                     <>
                       <div className="text-xs bg-muted/50 rounded-lg p-2.5 font-mono break-all">
-                        <span className="text-muted-foreground text-[0.6rem] block mb-1">Your miner ID</span>
+                        <span className="text-muted-foreground text-[0.6rem] block mb-1">Your miner ID (use this for Solo Mining)</span>
                         <span className="text-foreground">{user.id}</span>
                         <CopyButton text={user.id} />
                       </div>
                       <p className="text-[0.65rem] text-muted-foreground">
-                        Your ID is pre-configured in the miner. Each valid block you find credits <span className="text-amber-500 font-semibold">{formatZites(Number(info?.reward_zites ?? 128))} OmegaZites</span> to your balance.
+                        Enter this as your miner address in Solo Mining mode. Each valid block you find credits <span className="text-amber-500 font-semibold">{formatZites(Number(info?.reward_zites ?? 128))} OmegaZites</span> to your balance.
                       </p>
+                      <Alert className="py-2">
+                        <AlertDescription className="text-xs">
+                          Joining a pool on the site does not change what your miner does by itself. After joining, open the miner, switch to <strong>Pool Mining</strong>, and enter the pool's host/port (shown on the pool's page) plus your OmegaCases user id above. Solo Mining stays selected until you switch it yourself.
+                        </AlertDescription>
+                      </Alert>
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground">
@@ -394,16 +401,17 @@ export default function MinePage() {
                   )}
 
                   <Button className="gap-2 w-full" asChild>
-                    <a href="https://github.com/harsiz/OC-Miner/" target="_blank" rel="noopener noreferrer">
+                    <a href="https://github.com/harsiz/oc-miner" target="_blank" rel="noopener noreferrer">
                       <Download size={14} /> Download Miner
                     </a>
                   </Button>
 
                   <div className="text-[0.62rem] text-muted-foreground space-y-1">
-                    <p>• Hash function: <span className="font-mono text-foreground">SHA256(prev_hash + user_id + nonce)</span></p>
+                    <p>• Hash function: <span className="font-mono text-foreground">SHA256(prev_hash + id_no_dashes + nonce)</span></p>
                     <p>• Target block time: <span className="font-semibold text-foreground">6 minutes</span></p>
                     <p>• Difficulty adjusts every <span className="font-semibold text-foreground">10 blocks</span></p>
                     <p>• OmegaZites reward halves every <span className="font-semibold text-foreground">200 blocks</span></p>
+                    <p>• Pool mining: <NextLink href="/developer/docs/mining-pools" className="text-primary hover:underline">how pools work</NextLink></p>
                   </div>
                 </div>
               )}

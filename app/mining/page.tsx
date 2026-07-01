@@ -21,20 +21,30 @@ const STATUS_STYLES: Record<string, string> = {
 export default function MiningHubPage() {
   const { user } = useAuth()
   const [pools, setPools] = useState<MiningPool[]>([])
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   const fetchPools = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/mining/pools")
-      if (res.ok) {
-        const data = await res.json()
+      const [poolsRes, mineRes] = await Promise.all([
+        fetch("/api/mining/pools"),
+        user ? fetch(`/api/mining/pools?mine=1&user_id=${user.id}`) : Promise.resolve(null),
+      ])
+      if (poolsRes.ok) {
+        const data = await poolsRes.json()
         setPools(data.pools ?? [])
+      }
+      if (mineRes?.ok) {
+        const data = await mineRes.json()
+        setJoinedIds(new Set((data.pools ?? []).map((p: MiningPool) => p.id)))
+      } else {
+        setJoinedIds(new Set())
       }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user])
 
   useEffect(() => { fetchPools() }, [fetchPools])
 
@@ -42,6 +52,16 @@ export default function MiningHubPage() {
     if (!user) return
     await fetch(`/api/mining/pools/${poolId}/join`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id }),
+    })
+    fetchPools()
+  }
+
+  const handleLeave = async (poolId: string) => {
+    if (!user) return
+    await fetch(`/api/mining/pools/${poolId}/join`, {
+      method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: user.id }),
     })
@@ -111,7 +131,11 @@ export default function MiningHubPage() {
                     <NextLink href={`/mining/pools/${pool.id}`}>View</NextLink>
                   </Button>
                   {user && (
-                    <Button size="sm" className="flex-1" onClick={() => handleJoin(pool.id)}>Join Pool</Button>
+                    joinedIds.has(pool.id) ? (
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => handleLeave(pool.id)}>Leave Pool</Button>
+                    ) : (
+                      <Button size="sm" className="flex-1" onClick={() => handleJoin(pool.id)}>Join Pool</Button>
+                    )
                   )}
                 </div>
               </CardContent>
