@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Monitor, Smartphone, Download, Cpu, Hash, Clock, TrendingDown, TrendingUp, Zap, ChevronRight, RefreshCw, Copy, Check } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { ZitesIcon } from "@/components/zites-icon"
+import { formatZites } from "@/lib/format"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -110,7 +111,7 @@ function BlockCard({ block, onClick }: { block: MiningBlock; onClick: () => void
           <span className="text-[0.65rem] text-muted-foreground">{formatAge(block.found_at)}</span>
         </div>
         <span className="text-xs font-bold text-amber-500 flex items-center gap-1">
-          <ZitesIcon size={11} /> +{Number(block.reward_zites).toFixed(4)}
+          <ZitesIcon size={11} /> +{formatZites(Number(block.reward_zites))}
         </span>
       </div>
       <p className="text-[0.6rem] font-mono text-muted-foreground truncate mb-2">{block.hash}</p>
@@ -247,7 +248,7 @@ export default function MinePage() {
           {
             icon: <ZitesIcon size={14} />,
             label: "Block Reward",
-            value: info ? `${Number(info.reward_zites).toFixed(4)} Zites` : "—",
+            value: info ? `${formatZites(Number(info.reward_zites))} Zites` : "—",
           },
           {
             icon: <Zap size={14} className="text-yellow-400" />,
@@ -383,7 +384,7 @@ export default function MinePage() {
                         <CopyButton text={user.id} />
                       </div>
                       <p className="text-[0.65rem] text-muted-foreground">
-                        Your ID is pre-configured in the miner. Each valid block you find credits <span className="text-amber-500 font-semibold">{Number(info?.reward_zites ?? 128).toFixed(4)} OmegaZites</span> to your balance.
+                        Your ID is pre-configured in the miner. Each valid block you find credits <span className="text-amber-500 font-semibold">{formatZites(Number(info?.reward_zites ?? 128))} OmegaZites</span> to your balance.
                       </p>
                     </>
                   ) : (
@@ -437,7 +438,7 @@ export default function MinePage() {
                   <p className="text-xs text-muted-foreground">Miner</p>
                 </div>
                 <span className="ml-auto text-sm font-bold text-amber-500 flex items-center gap-1">
-                  <ZitesIcon size={13} /> +{Number(selectedBlock.reward_zites).toFixed(4)}
+                  <ZitesIcon size={13} /> +{formatZites(Number(selectedBlock.reward_zites))}
                 </span>
               </div>
 

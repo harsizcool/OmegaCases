@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
 import { ZitesIcon } from "@/components/zites-icon"
+import { formatZites } from "@/lib/format"
 import type { MiningPool } from "@/lib/types"
 
 interface RecentBlock {
@@ -128,7 +129,7 @@ export default function PoolDetailPage() {
                 <div key={b.height} className="flex items-center justify-between text-xs border-b border-border/40 pb-2 last:border-0">
                   <span className="font-mono font-bold text-muted-foreground">#{b.height}</span>
                   <span className="font-mono text-[0.6rem] truncate max-w-[200px]">{b.hash}</span>
-                  <span className="text-amber-500 font-semibold flex items-center gap-1"><ZitesIcon size={11} /> +{Number(b.reward_zites).toFixed(4)}</span>
+                  <span className="text-amber-500 font-semibold flex items-center gap-1"><ZitesIcon size={11} /> +{formatZites(Number(b.reward_zites))}</span>
                   <span className="text-muted-foreground">{new Date(b.found_at).toLocaleString()}</span>
                 </div>
               ))}

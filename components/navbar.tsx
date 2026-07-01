@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
+import { formatZites } from "@/lib/format"
 import { useThemeMode } from "./app-provider"
 import { useOnlineUsers } from "@/lib/use-online-users"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -392,7 +393,7 @@ export default function Navbar() {
                   href="/zites"
                   className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1.5 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
                 >
-                  <Sparkles size={12} /> {Number(user.zites_balance).toFixed(2)}
+                  <Sparkles size={12} /> {formatZites(Number(user.zites_balance))}
                 </NextLink>
               </div>
             )}
