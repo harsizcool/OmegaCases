@@ -595,6 +595,18 @@ function MiningPoolsDocs() {
         </CardBody>
       </Card>
 
+      <Warn>
+        <strong>You do not have to design this protocol yourself.</strong> The official miner at{" "}
+        <Code>github.com/harsiz/oc-miner</Code> already ships a working reference pool server,{" "}
+        <Code>oc-pool-server</Code>, that implements a small, documented protocol (the OC-Miner Pool
+        Protocol v1, newline-delimited JSON) and already answers PING with PONG and calls submit-block
+        for you. Most operators can just run <Code>oc-pool-server -listen 0.0.0.0:PORT -pool-id ID
+        -api-key KEY</Code> instead of writing anything. The miner itself already supports pointing at
+        any pool speaking this protocol, so members can mine to your pool immediately, no custom client
+        needed either. Build your own server only if you want different payout logic or a different
+        wire protocol.
+      </Warn>
+
       <H2>Prerequisites</H2>
       <p className="text-sm text-muted-foreground mb-6">
         You need a VPS or a machine you control (even a home computer works) with a public IPv4 or IPv6

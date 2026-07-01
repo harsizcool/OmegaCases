@@ -116,6 +116,35 @@ export default function PoolDetailPage() {
 
       {pool.description && <p className="text-sm text-muted-foreground mb-6">{pool.description}</p>}
 
+      {isMember && user && (
+        <Card className="bg-primary/5 border-primary/25 mb-6">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm font-bold flex items-center gap-1.5">
+              <Cpu size={14} className="text-primary" /> How to mine to this pool
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 flex flex-col gap-2 text-xs">
+            <p className="text-muted-foreground">
+              Joining here only tells OmegaCases you're part of this pool — it doesn't change what your miner does by itself.
+              Open your miner, switch it to <strong className="text-foreground">Pool Mining</strong>, and enter:
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="bg-muted/50 rounded-lg p-2.5">
+                <span className="text-muted-foreground text-[0.6rem] block mb-1">Pool host : port</span>
+                <span className="font-mono text-foreground">{pool.host}:{pool.port}</span>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-2.5">
+                <span className="text-muted-foreground text-[0.6rem] block mb-1">Your user id</span>
+                <span className="font-mono text-foreground break-all">{user.id}</span>
+              </div>
+            </div>
+            <p className="text-muted-foreground mt-1">
+              Don't have a pool-capable miner yet? <NextLink href="/mine" className="text-primary hover:underline">Get it from the Mining page</NextLink> — it supports both Solo and Pool modes.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="bg-card/60 mb-6">
         <CardHeader className="pb-2 pt-3 px-4">
           <CardTitle className="text-sm font-bold">Last Blocks Found</CardTitle>
