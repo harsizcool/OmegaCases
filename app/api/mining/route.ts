@@ -5,10 +5,11 @@ import {
   DIFFICULTY_ADJUSTMENT_INTERVAL,
   TARGET_BLOCK_TIME_MS,
   ZITES_HALVING_INTERVAL,
+  claimMiningBlock,
+  creditZitesBalance,
   getSetting,
   maybeRetargetDifficulty,
   normalizeTarget,
-  setSetting,
   verifyProofOfWork,
   zitesRewardAtHeight,
 } from "@/lib/mining"
@@ -116,30 +117,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: verification.error, debug: (verification as any).debug }, { status: 400 })
   }
 
-  // ── Claim the block (optimistic lock: insert will fail on duplicate height) ──
+  // ── Claim the block atomically (locks mining_height, inserts, advances height) ──
   const reward = zitesRewardAtHeight(currentHeight)
-  const { error: insertError } = await db.from("mining_blocks").insert({
-    height: currentHeight,
-    hash: hash.toLowerCase(),
-    nonce: Number(nonce),
-    miner_id,
-    previous_hash: previousHash,
+  const claim = await claimMiningBlock(db, {
+    expectedHeight: currentHeight,
+    hash,
+    nonce,
+    minerId: miner_id,
+    previousHash,
     target: currentTarget,
-    reward_zites: reward,
-    pool_id: null,
-    found_at: new Date().toISOString(),
+    rewardZites: reward,
+    poolId: null,
   })
 
-  if (insertError) {
+  if ("collision" in claim) {
     return NextResponse.json({ error: "Block already claimed — a faster miner beat you to it" }, { status: 409 })
   }
+  const newHeight = claim.newHeight
 
-  // ── Credit Zites balance ──
-  await db.from("users").update({ zites_balance: Number(miner.zites_balance) + reward }).eq("id", miner_id)
-
-  // ── Advance height ──
-  const newHeight = currentHeight + 1
-  await setSetting(db, "mining_height", String(newHeight))
+  // ── Credit Zites balance atomically ──
+  await creditZitesBalance(db, miner_id, reward)
 
   // ── Difficulty adjustment every DIFFICULTY_ADJUSTMENT_INTERVAL blocks ──
   const newTarget = await maybeRetargetDifficulty(db, currentTarget, newHeight)

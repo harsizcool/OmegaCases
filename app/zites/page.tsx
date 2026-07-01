@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TrendingUp, TrendingDown, RefreshCw, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { ZitesIcon } from "@/components/zites-icon"
+import { formatZites } from "@/lib/format"
 import type { ZitesOrder, ZitesTrade } from "@/lib/types"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -123,7 +124,7 @@ export default function ZitesPage() {
       if (!res.ok) {
         setMessage({ type: "error", text: data.error ?? "Order failed" })
       } else {
-        setMessage({ type: "success", text: data.filled > 0 ? `Filled ${Number(data.filled).toFixed(4)} Zites` : "Order placed" })
+        setMessage({ type: "success", text: data.filled > 0 ? `Filled ${formatZites(Number(data.filled))} Zites` : "Order placed" })
         setQuantity("")
         setPrice("")
         refreshAll()
@@ -164,7 +165,7 @@ export default function ZitesPage() {
         {[
           {
             label: "Your Zites",
-            value: user ? `${Number(user.zites_balance).toFixed(4)}` : "—",
+            value: user ? formatZites(Number(user.zites_balance)) : "—",
             icon: <ZitesIcon size={14} />,
           },
           {
@@ -177,7 +178,7 @@ export default function ZitesPage() {
           },
           {
             label: "24h Volume",
-            value: stats ? `${Number(stats.volume_24h).toFixed(4)} Zites` : "—",
+            value: stats ? `${formatZites(Number(stats.volume_24h))} Zites` : "—",
           },
         ].map(({ label, value, icon }) => (
           <Card key={label} className="bg-card/60">
@@ -209,7 +210,7 @@ export default function ZitesPage() {
                   {book.bids.slice(0, 15).map((row) => (
                     <div key={row.price} className="flex justify-between text-xs px-2 py-0.5 rounded bg-green-500/5">
                       <span className="text-green-400 font-semibold">${row.price.toFixed(4)}</span>
-                      <span className="text-muted-foreground">{row.quantity.toFixed(4)}</span>
+                      <span className="text-muted-foreground">{formatZites(row.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -231,7 +232,7 @@ export default function ZitesPage() {
                   {book.asks.slice(0, 15).map((row) => (
                     <div key={row.price} className="flex justify-between text-xs px-2 py-0.5 rounded bg-red-500/5">
                       <span className="text-red-400 font-semibold">${row.price.toFixed(4)}</span>
-                      <span className="text-muted-foreground">{row.quantity.toFixed(4)}</span>
+                      <span className="text-muted-foreground">{formatZites(row.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -252,7 +253,7 @@ export default function ZitesPage() {
                   {trades.map((t) => (
                     <div key={t.id} className="flex justify-between text-xs">
                       <span className="font-semibold">${Number(t.price).toFixed(4)}</span>
-                      <span className="text-muted-foreground">{Number(t.quantity).toFixed(4)} Zites</span>
+                      <span className="text-muted-foreground">{formatZites(Number(t.quantity))} Zites</span>
                       <span className="text-muted-foreground">{new Date(t.executed_at).toLocaleTimeString()}</span>
                     </div>
                   ))}
@@ -277,7 +278,7 @@ export default function ZitesPage() {
                         <span className={`font-semibold ${o.side === "buy" ? "text-green-400" : "text-red-400"}`}>
                           {o.side.toUpperCase()} {o.order_type}
                         </span>
-                        <span>{o.remaining_quantity.toFixed(4)} @ {o.price ? `$${o.price.toFixed(4)}` : "market"}</span>
+                        <span>{formatZites(o.remaining_quantity)} @ {o.price ? `$${o.price.toFixed(4)}` : "market"}</span>
                         <button onClick={() => handleCancel(o.id)} className="text-muted-foreground hover:text-destructive">
                           <X size={13} />
                         </button>

@@ -55,6 +55,47 @@ export async function setSetting(db: any, key: string, value: string) {
   await db.from("game_settings").upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" })
 }
 
+/** Atomically increments a user's Zites balance via a single locked SQL UPDATE (credit_zites_balance RPC). */
+export async function creditZitesBalance(db: any, userId: string, amount: number): Promise<number> {
+  const { data, error } = await db.rpc("credit_zites_balance", { p_user_id: userId, p_amount: amount })
+  if (error) throw error
+  return Number(data)
+}
+
+/**
+ * Atomically claims a block at `expectedHeight` (locks mining_height, inserts
+ * the block, advances height) via the claim_mining_block RPC. Returns the new
+ * height + inserted block id on success, or `{ collision: true }` if another
+ * submission already claimed/advanced past this height.
+ */
+export async function claimMiningBlock(db: any, opts: {
+  expectedHeight: number
+  hash: string
+  nonce: number | string
+  minerId: string
+  previousHash: string
+  target: string
+  rewardZites: number
+  poolId: string | null
+}): Promise<{ newHeight: number; blockId: string } | { collision: true }> {
+  const { data, error } = await db.rpc("claim_mining_block", {
+    p_expected_height: opts.expectedHeight,
+    p_hash: opts.hash.toLowerCase(),
+    p_nonce: Number(opts.nonce),
+    p_miner_id: opts.minerId,
+    p_previous_hash: opts.previousHash,
+    p_target: opts.target,
+    p_reward_zites: opts.rewardZites,
+    p_pool_id: opts.poolId,
+  })
+  if (error) {
+    if (error.message?.includes("height_mismatch")) return { collision: true }
+    throw error
+  }
+  const row = Array.isArray(data) ? data[0] : data
+  return { newHeight: Number(row.new_height), blockId: row.block_id }
+}
+
 /**
  * Build the proof-of-work preimage. Solo miners use their own user id;
  * pool-submitted blocks use the pool's id in its place (many people contribute
@@ -133,8 +174,19 @@ export async function maybeRetargetDifficulty(db: any, currentTarget: string, ne
   const clamped = scaled > MAX_TARGET ? MAX_TARGET : scaled < MIN_TARGET ? MIN_TARGET : scaled
   const newTarget = bigIntToTarget(clamped)
 
-  await setSetting(db, "mining_target", newTarget)
-  await setSetting(db, "mining_last_adj_height", String(newHeight))
+  // apply_difficulty_retarget locks mining_last_adj_height and no-ops if this
+  // boundary height was already processed by a concurrent submission, so two
+  // blocks landing on the same retarget boundary can't double-apply the factor.
+  const { data: applied, error } = await db.rpc("apply_difficulty_retarget", {
+    p_new_adj_height: newHeight,
+    p_new_target: newTarget,
+  })
+  if (error) throw error
+  if (!applied) {
+    // Someone else already retargeted for this height — return the authoritative stored target.
+    const stored = await getSetting(db, "mining_target")
+    return normalizeTarget(stored ?? newTarget)
+  }
 
   return newTarget
 }
