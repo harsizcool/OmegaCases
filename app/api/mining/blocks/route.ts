@@ -19,6 +19,18 @@ export async function GET(req: Request) {
       .eq("height", parseInt(heightParam, 10))
       .single()
     if (error || !data) return NextResponse.json({ error: "Block not found" }, { status: 404 })
+
+    // Pool blocks: attach the per-user share split so the UI can show who
+    // contributed without exposing the underlying miner_id (the pool owner).
+    if (data.pool_id) {
+      const { data: shares } = await db
+        .from("mining_pool_shares")
+        .select("user_id, shares, zites_credited, users(id, username, profile_picture, plus)")
+        .eq("block_id", data.id)
+        .order("zites_credited", { ascending: false })
+      data.shares = shares ?? []
+    }
+
     return NextResponse.json({ block: data })
   }
 

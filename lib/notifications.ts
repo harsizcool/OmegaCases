@@ -12,6 +12,7 @@ export type NotificationType =
   | "pool_liveness_failed"
   | "pool_offline"
   | "pool_block_found"
+  | "pool_reward"
 
 export async function createNotification({
   user_id,

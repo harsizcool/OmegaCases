@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import NextLink from "next/link"
-import { Bell, CheckCheck, ShoppingBag, ArrowLeftRight, Megaphone, CheckCircle, XCircle, MessageSquare, AtSign } from "lucide-react"
+import { Bell, CheckCheck, ShoppingBag, ArrowLeftRight, Megaphone, CheckCircle, XCircle, MessageSquare, AtSign, Cpu } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -26,6 +26,8 @@ function TypeIcon({ type }: { type: string }) {
     case "trade_cancelled":return <XCircle       size={14} className="text-red-500" />
     case "dm":             return <MessageSquare size={14} className="text-primary" />
     case "mention":        return <AtSign        size={14} className="text-purple-400" />
+    case "pool_block_found":
+    case "pool_reward":    return <Cpu           size={14} className="text-amber-500" />
     default:               return <Megaphone     size={14} className="text-amber-500" />
   }
 }
