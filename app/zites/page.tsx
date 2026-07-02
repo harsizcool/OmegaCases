@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TrendingUp, TrendingDown, RefreshCw, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { ZitesIcon } from "@/components/zites-icon"
-import { formatZites } from "@/lib/format"
+import { formatZites, formatZitesFull } from "@/lib/format"
+import SalesPriceChart from "@/components/sales-price-chart"
 import type { ZitesOrder, ZitesTrade } from "@/lib/types"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -55,7 +56,7 @@ export default function ZitesPage() {
   }, [])
 
   const fetchTrades = useCallback(async () => {
-    const res = await fetch("/api/zites/trades?limit=25")
+    const res = await fetch("/api/zites/trades?limit=100")
     if (res.ok) {
       const data = await res.json()
       setTrades(data.trades ?? [])
@@ -93,6 +94,14 @@ export default function ZitesPage() {
   }, [fetchStats, fetchBook, fetchTrades, fetchMyOrders])
 
   const refreshAll = () => { fetchStats(); fetchBook(); fetchTrades(); fetchMyOrders() }
+
+  const chartData = useMemo(
+    () => [...trades].reverse().map((t) => ({
+      date: new Date(t.executed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      price: Number(t.price),
+    })),
+    [trades]
+  )
 
   const handleSubmit = async () => {
     if (!user) return
@@ -165,7 +174,7 @@ export default function ZitesPage() {
         {[
           {
             label: "Your Zites",
-            value: user ? formatZites(Number(user.zites_balance)) : "—",
+            value: user ? formatZitesFull(Number(user.zites_balance)) : "—",
             icon: <ZitesIcon size={14} />,
           },
           {
@@ -192,6 +201,20 @@ export default function ZitesPage() {
           </Card>
         ))}
       </div>
+
+      {/* Price chart */}
+      <Card className="bg-card/60 mb-5">
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm font-bold">Price Chart</CardTitle>
+        </CardHeader>
+        <CardContent className="px-2 pb-3">
+          {chartData.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-10">Not enough trade history yet</p>
+          ) : (
+            <SalesPriceChart data={chartData} color="#f59e0b" />
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Order book */}

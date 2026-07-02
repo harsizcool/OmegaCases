@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
-import { formatZites } from "@/lib/format"
+import { formatZites, formatZitesFull } from "@/lib/format"
 import { useThemeMode } from "./app-provider"
 import { useOnlineUsers } from "@/lib/use-online-users"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -389,12 +389,19 @@ export default function Navbar() {
                   ${Number(user.balance).toFixed(2)}
                 </button>
                 <div className="w-px self-stretch bg-primary/25" />
-                <NextLink
-                  href="/zites"
-                  className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1.5 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
-                >
-                  <Sparkles size={12} /> {formatZites(Number(user.zites_balance))}
-                </NextLink>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <NextLink
+                        href="/zites"
+                        className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1.5 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                      >
+                        <Sparkles size={12} /> {formatZites(Number(user.zites_balance))}
+                      </NextLink>
+                    </TooltipTrigger>
+                    <TooltipContent>{formatZitesFull(Number(user.zites_balance))} Zites</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
 

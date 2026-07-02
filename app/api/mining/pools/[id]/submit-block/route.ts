@@ -118,6 +118,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       zites_credited: zitesCredited,
     })
     payouts.push({ user_id: s.user_id, shares: s.shares, zites_credited: zitesCredited })
+
+    await createNotification({
+      user_id: s.user_id,
+      type: "pool_reward",
+      title: "You earned Zites from a pool block",
+      body: `${pool.name} found block #${currentHeight} — you earned ${zitesCredited.toFixed(4)} Zites from the share split.`,
+      link: `/mining/pools/${poolId}`,
+    })
   }
 
   await db

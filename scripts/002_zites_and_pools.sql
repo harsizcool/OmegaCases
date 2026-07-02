@@ -72,6 +72,10 @@ CREATE INDEX IF NOT EXISTS idx_pool_heartbeats_pool_time ON public.mining_pool_h
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Mining blocks (rebuilt fresh; table was already emptied before this migration)
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Drop mining_pool_shares first: if a previous partial run of this script already
+-- created it, its FK into mining_blocks would otherwise block the DROP below.
+-- It gets recreated fresh further down anyway.
+DROP TABLE IF EXISTS public.mining_pool_shares;
 DROP TABLE IF EXISTS public.mining_blocks;
 CREATE TABLE public.mining_blocks (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
