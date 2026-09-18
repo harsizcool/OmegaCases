@@ -28,7 +28,12 @@ const (
 	// that is used when git is not installed.
 	repoWeb = "https://github.com/harsizcool/OmegaCases"
 	// DefaultBranch is fetched unless --branch says otherwise.
-	DefaultBranch = "main"
+	//
+	// This is release, not the repository's default branch: main does not carry
+	// scripts/004_app_schema_alignment.sql, and a database built without it is
+	// missing ten tables the application queries. Once that migration reaches
+	// main, this can move back.
+	DefaultBranch = "release"
 )
 
 // HomeDir is the home directory of the person running setup, which is not the
