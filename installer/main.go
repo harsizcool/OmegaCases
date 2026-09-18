@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harsizcool/omegacases/installer/internal/bootstrap"
 	"github.com/harsizcool/omegacases/installer/internal/config"
 	"github.com/harsizcool/omegacases/installer/internal/dbmigrate"
 	"github.com/harsizcool/omegacases/installer/internal/doctor"
@@ -35,19 +36,28 @@ var version = "1.0.0"
 
 const totalSteps = 7
 
+// Options that apply to the whole run, pulled out of the arguments before the
+// subcommand is worked out.
+var (
+	branchFlag = new(string)
+	dirFlag    = new(string)
+)
+
 func main() {
 	ui.Init()
 
+	args := parseOptions(os.Args[1:])
+
 	command := ""
-	if len(os.Args) > 1 {
-		command = strings.TrimPrefix(strings.ToLower(os.Args[1]), "--")
+	if len(args) > 0 {
+		command = strings.TrimPrefix(strings.ToLower(args[0]), "--")
 	}
 
 	switch command {
 	case "", "install", "setup":
 		exit(install())
 	case "start", "stop", "restart", "status", "logs", "update":
-		exit(control(command))
+		exit(control(command, logsArg(args)))
 	case "uninstall", "remove":
 		exit(uninstall())
 	case "version", "v":
@@ -55,17 +65,61 @@ func main() {
 	case "help", "h", "?":
 		usage()
 	default:
-		fmt.Printf("Unknown command %q.\n\n", os.Args[1])
+		fmt.Printf("Unknown command %q.\n\n", args[0])
 		usage()
 		os.Exit(2)
 	}
 }
 
+// parseOptions pulls --branch and --dir out of the arguments, in either the
+// "--flag value" or "--flag=value" spelling, and returns what is left.
+func parseOptions(args []string) []string {
+	var rest []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, value, hasValue := strings.Cut(arg, "=")
+
+		var target *string
+		switch strings.ToLower(name) {
+		case "--branch", "-b":
+			target = branchFlag
+		case "--dir", "--directory", "-d":
+			target = dirFlag
+		default:
+			rest = append(rest, arg)
+			continue
+		}
+
+		if hasValue {
+			*target = value
+			continue
+		}
+		if i+1 < len(args) {
+			i++
+			*target = args[i]
+			continue
+		}
+		fmt.Printf("%s needs a value.\n", name)
+		os.Exit(2)
+	}
+	return rest
+}
+
+// logsArg is the optional service name for the logs subcommand, after the
+// options have been stripped out.
+func logsArg(args []string) string {
+	if len(args) > 1 {
+		return args[1]
+	}
+	return ""
+}
+
 func usage() {
 	fmt.Println(`OmegaCases setup
 
-  (no arguments)   Guided install: asks for your keys and domain, then sets
-                   everything up and tells you how to run it.
+  (no arguments)   Guided install: downloads the source code and Docker if they
+                   are not here yet, asks for your keys and domain, sets
+                   everything up, and tells you how to run it.
 
   start            Start the site.
   stop             Stop the site. Data is kept.
@@ -74,7 +128,13 @@ func usage() {
   logs [service]   Follow the logs.
   update           Rebuild the site from the current source code.
   uninstall        Stop and remove everything, with a confirmation first.
-  version          Print the version.`)
+  version          Print the version.
+
+Options:
+
+  --dir PATH       Where the source code is, or should be downloaded to.
+                   Default when downloading: ` + bootstrap.DefaultProjectDir() + `
+  --branch NAME    Which branch to download. Default: ` + bootstrap.DefaultBranch)
 }
 
 // exit closes the program, holding the window open when it was double-clicked
@@ -106,10 +166,20 @@ func install() error {
 	ui.Say("  the site itself, and an HTTPS address to reach it on. It takes about")
 	ui.Say("  ten minutes, most of which is downloading and building.")
 	ui.Say("")
-	ui.Say("  %s", ui.Dim("You will need: Docker installed, and (for a public site) a domain"))
-	ui.Say("  %s", ui.Dim("name already pointed at this machine."))
+	ui.Say("  %s", ui.Dim("Anything missing — the source code, Docker — setup offers to install."))
+	ui.Say("  %s", ui.Dim("For a public site you will need a domain pointed at this machine."))
 
-	projectDir, err := findProjectDir()
+	ui.Section(1, totalSteps, "Checking this machine")
+
+	// The log lives beside the project, so it cannot be opened until the
+	// project's location is known — which may mean downloading it first.
+	tempRun, err := runner.New(workingDir(), filepath.Join(os.TempDir(), "omega-setup-bootstrap.log"))
+	if err != nil {
+		return err
+	}
+
+	projectDir, err := locateOrFetchProject(tempRun)
+	tempRun.Close()
 	if err != nil {
 		return err
 	}
@@ -120,9 +190,6 @@ func install() error {
 	}
 	defer run.Close()
 	run.Note("setup %s on %s/%s, project %s", version, runtime.GOOS, runtime.GOARCH, projectDir)
-
-	ui.Section(1, totalSteps, "Checking this machine")
-	ui.Done("project found at %s", projectDir)
 
 	if err := checkPrerequisites(run); err != nil {
 		return err
@@ -239,8 +306,110 @@ func install() error {
 	return nil
 }
 
+// locateOrFetchProject finds the source tree, or offers to download it when
+// this is a bare machine with nothing checked out yet.
+func locateOrFetchProject(run *runner.Runner) (string, error) {
+	if dir, found := searchForProject(); found {
+		ui.Done("source code found at %s", dir)
+		return dir, nil
+	}
+
+	ui.Say("")
+	ui.Say("  The OmegaCases source code is not here yet.")
+	ui.Say("")
+	choice := ui.Choice("What should setup do?", []string{
+		"Download it for me (recommended)\nFetches the code from GitHub into a folder of your choosing.",
+		"It is already on this machine\nYou type the path to it.",
+	}, 0)
+
+	if choice == 1 {
+		for attempt := 0; attempt < 3; attempt++ {
+			answer := strings.Trim(strings.TrimSpace(ui.Ask("Full path to the project folder", "")), `"`)
+			if isProjectDir(answer) {
+				return filepath.Clean(answer), nil
+			}
+			ui.Warn("%s does not look like the OmegaCases project.", answer)
+			ui.Say("      %s", ui.Dim("It should contain package.json, an app folder and a scripts folder."))
+		}
+		return "", errors.New("could not find the project — run setup from inside the project folder")
+	}
+
+	// --dir doubles as the download destination when nothing is there yet.
+	destination := bootstrap.DefaultProjectDir()
+	if *dirFlag != "" {
+		destination = filepath.Clean(strings.Trim(*dirFlag, `"`))
+	}
+	dir := ui.Ask("Where should it go?", destination)
+	dir = filepath.Clean(strings.Trim(strings.TrimSpace(dir), `"`))
+	if !filepath.IsAbs(dir) {
+		if abs, err := filepath.Abs(dir); err == nil {
+			dir = abs
+		}
+	}
+
+	branch := bootstrap.DefaultBranch
+	if *branchFlag != "" {
+		branch = *branchFlag
+	}
+	ui.Say("")
+	ui.Say("  Setup will download the %s branch of", ui.Bold(branch))
+	ui.Say("      %s", ui.Cyan(bootstrap.Repo))
+	ui.Say("  into %s", ui.Cyan(dir))
+	ui.Say("")
+	if !ui.Confirm("Go ahead?", true) {
+		return "", errors.New("stopped before downloading anything")
+	}
+
+	if err := bootstrap.FetchSource(run, dir, branch); err != nil {
+		return "", err
+	}
+	if !isProjectDir(dir) {
+		return "", fmt.Errorf("the download finished but %s does not look like the project — "+
+			"check that the %q branch is the right one", dir, branch)
+	}
+	ui.Done("source code ready at %s", dir)
+	return dir, nil
+}
+
 func checkPrerequisites(run *runner.Runner) error {
 	dockerCheck := doctor.Docker(run)
+
+	// Nothing installed at all: offer to do it, where setup is able to.
+	if !dockerCheck.OK && !runner.Look("docker") {
+		method, can := bootstrap.DockerInstallable()
+		if can {
+			ui.Say("")
+			ui.Say("  Docker is not installed. It is what runs the database and the site.")
+			ui.Say("")
+			ui.Say("  %s", bootstrap.DescribeInstall(method))
+			ui.Say("")
+			if ui.Confirm("Install Docker now?", true) {
+				if err := bootstrap.InstallDocker(run, method); err != nil {
+					ui.Fail("%s", err)
+					ui.Say("")
+					ui.Say("  %s Install it yourself, then run setup again:", ui.Bold("What to do:"))
+					ui.Say("      %s", ui.Cyan(manualDockerHint()))
+					return errors.New("Docker could not be installed automatically")
+				}
+				if note := bootstrap.NeedsRestartAfterInstall(method); note != "" {
+					ui.Say("")
+					ui.Say("  %s", note)
+					return errors.New("Docker needs a restart before setup can continue")
+				}
+				dockerCheck = doctor.Docker(run)
+			}
+		} else if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+			// Docker Desktop cannot be installed unattended without winget.
+			ui.Say("")
+			ui.Say("  Docker is not installed, and setup cannot install it on this machine.")
+			ui.Say("")
+			ui.Say("  %s Download and install Docker Desktop from:", ui.Bold("What to do:"))
+			ui.Say("      %s", ui.Cyan("https://www.docker.com/products/docker-desktop/"))
+			ui.Say("  Open it once, wait until it says it is running, then run setup again.")
+			return errors.New("Docker has to be installed before setup can continue")
+		}
+	}
+
 	if !dockerCheck.OK && runner.Look("docker") {
 		// The engine is installed but not answering yet, which is far more often
 		// a machine that has just booted than a broken installation.
@@ -453,7 +622,7 @@ func createAdmin(cfg *config.Config, st *stack.Stack) {
 
 // ─── other subcommands ──────────────────────────────────────────────────────
 
-func control(command string) error {
+func control(command, logsService string) error {
 	cfg, st, run, err := openExisting()
 	if err != nil {
 		return err
@@ -486,13 +655,9 @@ func control(command string) error {
 		ui.Say("")
 		ui.Say("  Address: %s", ui.Cyan(cfg.PublicURL()))
 	case "logs":
-		service := ""
-		if len(os.Args) > 2 {
-			service = os.Args[2]
-		}
 		args := []string{"compose", "logs", "-f", "--tail=100"}
-		if service != "" {
-			args = append(args, service)
+		if logsService != "" {
+			args = append(args, logsService)
 		}
 		_, err := run.Run("docker", args, runner.Stream(), runner.In(cfg.StackDir()))
 		return err
@@ -712,23 +877,38 @@ work; their uptime percentages simply do not update on their own.
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-// findProjectDir locates the OmegaCases source tree, looking outward from the
-// working directory and then from the program's own location, so the binary
-// works whether it is run from inside the project or dropped beside it.
-func findProjectDir() (string, error) {
-	var candidates []string
+func workingDir() string {
 	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, cwd)
+		return cwd
 	}
-	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Dir(exe))
+	return "."
+}
+
+// searchForProject looks for the source tree: where --dir says, then outward
+// from the working directory and the program's own location, then in the
+// default download folder. That covers the binary being run from inside the
+// project, dropped beside it, or run from a desktop after a previous download.
+func searchForProject() (string, bool) {
+	if *dirFlag != "" {
+		dir := filepath.Clean(strings.Trim(*dirFlag, `"`))
+		if isProjectDir(dir) {
+			return dir, true
+		}
+		ui.Warn("%s does not look like the OmegaCases project.", dir)
+		return "", false
 	}
 
-	for _, start := range candidates {
+	var starts []string
+	starts = append(starts, workingDir())
+	if exe, err := os.Executable(); err == nil {
+		starts = append(starts, filepath.Dir(exe))
+	}
+
+	for _, start := range starts {
 		dir := start
 		for i := 0; i < 5; i++ {
 			if isProjectDir(dir) {
-				return dir, nil
+				return dir, true
 			}
 			parent := filepath.Dir(dir)
 			if parent == dir {
@@ -739,22 +919,41 @@ func findProjectDir() (string, error) {
 		// Also look one level down, for a binary sitting next to the checkout.
 		if entries, err := os.ReadDir(start); err == nil {
 			for _, entry := range entries {
-				if entry.IsDir() && isProjectDir(filepath.Join(start, entry.Name())) {
-					return filepath.Join(start, entry.Name()), nil
+				candidate := filepath.Join(start, entry.Name())
+				if entry.IsDir() && isProjectDir(candidate) {
+					return candidate, true
 				}
 			}
 		}
 	}
 
+	if fallback := bootstrap.DefaultProjectDir(); isProjectDir(fallback) {
+		return fallback, true
+	}
+	return "", false
+}
+
+// findProjectDir is the non-installing lookup used by the other subcommands,
+// which act on a deployment that already exists.
+func findProjectDir() (string, error) {
+	if dir, found := searchForProject(); found {
+		return dir, nil
+	}
 	ui.Say("")
 	ui.Warn("The OmegaCases source code could not be found from here.")
-	answer := ui.Ask("Full path to the project folder", "")
-	answer = strings.Trim(strings.TrimSpace(answer), `"`)
+	answer := strings.Trim(strings.TrimSpace(ui.Ask("Full path to the project folder", "")), `"`)
 	if isProjectDir(answer) {
 		return filepath.Clean(answer), nil
 	}
 	return "", fmt.Errorf("%s does not look like the OmegaCases project "+
 		"(it should contain package.json and a scripts folder)", answer)
+}
+
+func manualDockerHint() string {
+	if runtime.GOOS == "linux" {
+		return "curl -fsSL https://get.docker.com | sudo sh"
+	}
+	return "https://www.docker.com/products/docker-desktop/"
 }
 
 func isProjectDir(dir string) bool {

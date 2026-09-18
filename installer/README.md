@@ -6,28 +6,47 @@ website before.
 
 ## What you need first
 
-- **Docker.** On Windows or macOS that means [Docker Desktop](https://www.docker.com/products/docker-desktop/);
-  on Linux, `curl -fsSL https://get.docker.com | sh`.
-- **A copy of the OmegaCases source code** (this repository).
-- **For a public site:** a domain whose DNS A record already points at the
-  machine, and ports 80 and 443 free on it.
+Nothing but the setup program itself. On a fresh machine with no Docker and no
+copy of the code, setup offers to fetch both:
+
+- **The source code** — downloaded from GitHub into `~/websites/omegacases` by
+  default (`C:\Users\you\websites\omegacases` on Windows). It uses `git` when
+  available, so you can pull updates later, and falls back to a zip download
+  when git is not installed.
+- **Docker** — installed for you on Linux (the official get.docker.com script)
+  and on Windows where `winget` is available. Elsewhere, setup points you at the
+  Docker Desktop download and waits for you to run setup again.
+
+Neither happens without being described first and agreed to.
+
+**For a public site** you also need a domain whose DNS A record points at the
+machine, and ports 80 and 443 free on it.
 
 You do not need a Supabase account, a Vercel account, or a database. Setup
 creates the database itself.
 
 ## Running it
 
-**Windows** — put `SETUP.EXE` in the project folder and double-click it.
+**Windows** — double-click `SETUP.EXE`. It can sit anywhere: in the project
+folder if you already have the code, or on your desktop if you do not.
 
 **Debian or Ubuntu**
 
 ```
 sudo dpkg -i omegacases-setup_1.0.0_amd64.deb
-cd /path/to/omegacases
 sudo omegacases-setup
 ```
 
-`sudo` is needed on Linux because the proxy binds ports 80 and 443.
+`sudo` is needed because the proxy binds ports 80 and 443 (and because
+installing Docker needs root). Run it from inside the project folder if you
+already have the code; from anywhere if you want setup to download it.
+
+Two options apply to the whole run:
+
+```
+--dir PATH       where the code is, or should be downloaded to
+--branch NAME    which branch to download (default: main)
+```
 
 Setup asks about a dozen questions, all with sensible defaults, then does the
 work. It takes around ten minutes, mostly building the site. Nothing is changed
@@ -113,6 +132,7 @@ Requires Go 1.24 or newer. There are no third-party dependencies.
 
 | Package | Responsibility |
 |---|---|
+| `internal/bootstrap` | fetching the source code and installing Docker on a bare machine |
 | `internal/ui` | prompts, colours, the step log |
 | `internal/wizard` | the questions and the summary |
 | `internal/doctor` | Docker, port and DNS checks, each with a plain-language fix |
