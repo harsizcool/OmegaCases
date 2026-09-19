@@ -527,6 +527,51 @@ func sqlLiteral(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
+// SeedDemoContent fills a brand new test site with something to look at: a
+// small item pool, and a balance and cases on the admin account.
+//
+// It is only offered for a local copy. A real site's owner wants their own
+// items, and the seed refuses to touch a pool that already has any.
+func (s *Stack) SeedDemoContent(adminUsername string) error {
+	body, err := templates.ReadFile("templates/demo-content.sql.tmpl")
+	if err != nil {
+		return err
+	}
+	t, err := template.New("demo").Parse(string(body))
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, map[string]string{
+		"AdminLiteral": sqlLiteral(adminUsername),
+		"Common":       sqlLiteral(placeholderImage("C", "158,158,158")),
+		"Uncommon":     sqlLiteral(placeholderImage("U", "76,175,80")),
+		"Rare":         sqlLiteral(placeholderImage("R", "33,150,243")),
+		"Legendary":    sqlLiteral(placeholderImage("L", "255,152,0")),
+		"Omega":        sqlLiteral(placeholderImage("O", "244,67,54")),
+	}); err != nil {
+		return err
+	}
+
+	out, err := s.ExecSQL(buf.String())
+	if err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(lastLine(out)))
+	}
+	return nil
+}
+
+// placeholderImage draws an item picture as an inline SVG, so a test copy needs
+// no internet connection and nothing hosting images. The colours match the
+// rarity colours the site uses.
+func placeholderImage(letter, rgb string) string {
+	return "data:image/svg+xml;utf8," +
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+		`<rect width="64" height="64" rx="12" fill="rgb(` + rgb + `)"/>` +
+		`<text x="32" y="43" font-family="sans-serif" font-size="30" font-weight="bold"` +
+		` text-anchor="middle" fill="white">` + letter + `</text></svg>`
+}
+
 // RegisterUser creates an account through the site's own signup route, so the
 // password is hashed exactly the way the login page will check it.
 //

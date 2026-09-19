@@ -168,12 +168,13 @@ func holdWindow() {
 
 func install() error {
 	ui.Banner(version + " · build " + buildStamp)
-	ui.Say("  This will set up the OmegaCases website on this machine: the database,")
-	ui.Say("  the site itself, and an HTTPS address to reach it on. It takes about")
-	ui.Say("  ten minutes, most of which is downloading and building.")
+	ui.Say("  This sets up the whole OmegaCases website on this computer and gets it")
+	ui.Say("  running — the site, its database, everything. It takes about ten minutes,")
+	ui.Say("  nearly all of it waiting for downloads.")
 	ui.Say("")
-	ui.Say("  %s", ui.Dim("Anything missing — the source code, Docker — setup offers to install."))
-	ui.Say("  %s", ui.Dim("For a public site you will need a domain pointed at this machine."))
+	ui.Say("  %s", ui.Dim("You will be asked a few questions. Every one has a sensible answer"))
+	ui.Say("  %s", ui.Dim("already filled in, so pressing Enter through them all works fine."))
+	ui.Say("  %s", ui.Dim("Nothing is installed or changed until you have seen a summary."))
 
 	ui.Section(1, totalSteps, "Checking this machine")
 
@@ -230,11 +231,12 @@ func install() error {
 		if res := doctor.DNS(cfg.Domain); !res.OK {
 			ui.Warn("%s", res.Detail)
 			if res.Remedy != "" {
-				ui.Say("      %s", ui.Dim(res.Remedy))
+				ui.Say("")
+				ui.Block(res.Remedy)
 			}
 			ui.Say("")
-			if !ui.Confirm("Continue anyway? (the site will work once DNS updates)", true) {
-				return errors.New("stopped so the domain's DNS record can be set up first")
+			if !ui.Confirm("Carry on setting up anyway?", true) {
+				return errors.New("stopped so the web address can be pointed here first")
 			}
 		} else {
 			ui.Done("%s %s", cfg.Domain, res.Detail)
@@ -269,7 +271,7 @@ func install() error {
 	if err := st.Write(); err != nil {
 		return fmt.Errorf("could not write the deployment files: %w", err)
 	}
-	ui.Done("wrote omega-stack/ (deployment, proxy config, start and stop scripts)")
+	ui.Done("wrote the omega-stack folder — everything needed to run the site")
 	if err := cfg.Save(); err != nil {
 		ui.Warn("could not save your answers for next time: %s", err)
 	}
@@ -315,6 +317,17 @@ func install() error {
 
 	if cfg.DBMode == config.DBLocal && cfg.AdminUsername != "" {
 		createAdmin(cfg, st)
+	}
+
+	// After the account exists, so the balance and cases land on it.
+	if cfg.DBMode == config.DBLocal && cfg.SeedItems {
+		ui.Step("adding test items and something to spend")
+		if err := st.SeedDemoContent(cfg.AdminUsername); err != nil {
+			ui.Warn("could not add the test items: %s", err)
+			ui.Say("      %s", ui.Dim("The site works; it just starts empty. Add items from the admin page."))
+		} else {
+			ui.Done("test items added")
+		}
 	}
 
 	if err := writeInstructions(cfg); err != nil {
@@ -510,7 +523,8 @@ func checkPrerequisites(run *runner.Runner) error {
 				if err := bootstrap.InstallDocker(run, method); err != nil {
 					ui.Fail("%s", err)
 					ui.Say("")
-					ui.Say("  %s Install it yourself, then run setup again:", ui.Bold("What to do:"))
+					ui.Say("  %s", ui.Bold("What to do:"))
+					ui.Block("Install it yourself, then run setup again:")
 					ui.Say("      %s", ui.Cyan(manualDockerHint()))
 					return errors.New("Docker could not be installed automatically")
 				}
@@ -524,11 +538,15 @@ func checkPrerequisites(run *runner.Runner) error {
 		} else if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 			// Docker Desktop cannot be installed unattended without winget.
 			ui.Say("")
-			ui.Say("  Docker is not installed, and setup cannot install it on this machine.")
+			ui.Say("  %s", ui.Bold("One thing is missing: Docker."))
 			ui.Say("")
-			ui.Say("  %s Download and install Docker Desktop from:", ui.Bold("What to do:"))
+			ui.Block(doctor.WhatIsDocker)
+			ui.Say("")
+			ui.Say("  %s", ui.Bold("What to do:"))
+			ui.Block("Download Docker Desktop — it is free:")
 			ui.Say("      %s", ui.Cyan("https://www.docker.com/products/docker-desktop/"))
-			ui.Say("  Open it once, wait until it says it is running, then run setup again.")
+			ui.Block("Install it, open it once, and wait until it says it is running.\n" +
+				"Then start this setup again.")
 			return errors.New("Docker has to be installed before setup can continue")
 		}
 	}
@@ -559,7 +577,8 @@ func checkPrerequisites(run *runner.Runner) error {
 		ui.Fail("%s: %s", res.Name, res.Detail)
 		if res.Remedy != "" {
 			ui.Say("")
-			ui.Say("  %s %s", ui.Bold("What to do:"), res.Remedy)
+			ui.Say("  %s", ui.Bold("What to do:"))
+			ui.Block(res.Remedy)
 		}
 		if res.Fatal {
 			return fmt.Errorf("%s has to be working before setup can continue", res.Name)
@@ -575,7 +594,7 @@ func checkPublicPorts(cfg *config.Config, run *runner.Runner) error {
 	for _, check := range []struct {
 		port, purpose string
 	}{
-		{cfg.HTTPPort, "the certificate check and the redirect to HTTPS"},
+		{cfg.HTTPPort, "setting up the padlock, and sending visitors to the secure address"},
 		{cfg.HTTPSPort, "the website itself"},
 	} {
 		res := doctor.Port(check.port, true, check.purpose)
@@ -739,14 +758,14 @@ func verifyDeployment(cfg *config.Config, st *stack.Stack, run *runner.Runner) e
 	}
 
 	if cfg.Exposure == config.ExposeDomain {
-		ui.Step("checking the HTTPS certificate for %s", cfg.Domain)
+		ui.Step("checking the padlock is working on %s", cfg.Domain)
 		// Issuance normally takes a few seconds once DNS is correct, but a
 		// pending DNS change can make it take much longer, and that is not a
 		// failed install.
 		if _, err := stack.WaitForHTTP("https://"+cfg.Domain+"/", 90*time.Second); err != nil {
-			ui.Warn("%s is not serving HTTPS yet.", cfg.Domain)
-			ui.Say("      %s", ui.Dim("This is normal if the domain's DNS was changed recently. The"))
-			ui.Say("      %s", ui.Dim("certificate is retried automatically; check again in a few minutes."))
+			ui.Warn("%s is not secure yet.", cfg.Domain)
+			ui.Say("      %s", ui.Dim("Normal if you only just pointed the address at this computer. It"))
+			ui.Say("      %s", ui.Dim("keeps trying on its own, so check the site again in a few minutes."))
 			run.Note("acme not ready: %v", err)
 		} else {
 			ui.Done("HTTPS is working on %s", cfg.Domain)
@@ -906,13 +925,29 @@ func printFinalInstructions(cfg *config.Config, logPath string) {
 	ui.Say("%s", ui.Bold(ui.Green("   Done. OmegaCases is running.")))
 	ui.Say("%s", ui.Green("  ═══════════════════════════════════════════════════════"))
 	ui.Say("")
-	ui.Say("  %s  %s", ui.Bold("Open your site:"), ui.Cyan(cfg.PublicURL()))
+	ui.Say("  %s  %s", ui.Bold("Open this in your browser:"), ui.Cyan(cfg.PublicURL()))
 	if cfg.AdminUsername != "" {
 		ui.Say("")
-		ui.Say("  %s", ui.Bold("Sign in as the admin:"))
+		ui.Say("  %s", ui.Bold("Log in with:"))
 		ui.Say("      username   %s", cfg.AdminUsername)
 		ui.Say("      password   %s", cfg.AdminPassword)
-		ui.Say("      %s", ui.Yellow("Write this password down now — it is not stored anywhere."))
+		ui.Say("      %s", ui.Yellow("Write the password down now — it is not saved anywhere."))
+		ui.Say("")
+		ui.Say("  %s", ui.Dim("That account is an admin, so it has an Admin link in the menu for"))
+		ui.Say("  %s", ui.Dim("adding items, setting prices, and topping up accounts."))
+	}
+	if cfg.SeedItems {
+		ui.Say("")
+		ui.Say("  %s", ui.Bold("To try it out:"))
+		ui.Say("  %s", ui.Dim("Your account already has 250 cases and $100, and there are nine test"))
+		ui.Say("  %s", ui.Dim("items to unbox. Open a case, sell something, try the chat. Replace"))
+		ui.Say("  %s", ui.Dim("the test items with your own from the Admin page whenever you like."))
+	}
+	if cfg.Exposure == config.ExposeLocal {
+		ui.Say("")
+		ui.Say("  %s", ui.Dim("This copy is only visible on this computer. To put it online later,"))
+		ui.Say("  %s", ui.Dim("run this setup again and choose the internet option — your accounts"))
+		ui.Say("  %s", ui.Dim("and items are kept."))
 	}
 	ui.Say("")
 	ui.Say("  %s", ui.Bold("Day to day:"))
@@ -927,18 +962,21 @@ func printFinalInstructions(cfg *config.Config, logPath string) {
 	ui.Say("      Is it up?    %s", ui.Cyan(binaryName()+" status"))
 	ui.Say("      Update it    %s", ui.Cyan(binaryName()+" update"))
 	ui.Say("")
-	ui.Say("  The site restarts by itself when this machine reboots, so there is")
-	ui.Say("  nothing to do after a power cut.")
+	ui.Say("  The site starts itself again if this computer restarts, so a reboot or")
+	ui.Say("  a power cut needs nothing from you.")
 	ui.Say("")
 	if cfg.NowPaymentsAPIKey != "" {
-		ui.Say("  %s", ui.Bold("One thing left, in your NOWPayments dashboard:"))
-		ui.Say("      Set the IPN callback URL to  %s",
-			ui.Cyan(cfg.PublicURL()+"/api/payments/webhook"))
-		ui.Say("      %s", ui.Dim("Without it, deposits stay pending instead of crediting."))
+		ui.Say("  %s", ui.Bold("One last thing, over on the NOWPayments website:"))
+		ui.Say("  In your dashboard there is a box for a callback or IPN address. Put")
+		ui.Say("  this in it:")
+		ui.Say("      %s", ui.Cyan(cfg.PublicURL()+"/api/payments/webhook"))
+		ui.Say("      %s", ui.Dim("That is how they tell your site a payment arrived. Without it,"))
+		ui.Say("      %s", ui.Dim("money people pay in never shows up in their balance."))
 		ui.Say("")
 	}
-	ui.Say("  %s", ui.Dim("Written for you: HOW-TO-RUN.md (the same instructions, to keep)"))
-	ui.Say("  %s", ui.Dim("Full transcript of this install: "+filepath.Base(logPath)))
+	ui.Say("  %s", ui.Dim("These instructions are also saved as HOW-TO-RUN.md, so you can"))
+	ui.Say("  %s", ui.Dim("read them again whenever you need to."))
+	ui.Say("  %s", ui.Dim("If anything ever goes wrong, "+filepath.Base(logPath)+" has the details."))
 	ui.Say("")
 }
 

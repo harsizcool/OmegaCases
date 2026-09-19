@@ -388,15 +388,19 @@ func InstallDocker(r *runner.Runner, method string) error {
 	}
 }
 
-// DescribeInstall is the sentence shown before asking permission to install.
+// DescribeInstall says what setup is about to do, before it asks permission.
+// Downloading and running someone else's installer is not something to do
+// quietly, even when it is the normal way to install the thing.
 func DescribeInstall(method string) string {
 	switch method {
 	case "script":
-		return "Setup can install Docker for you. It downloads the official script from\n" +
-			"  get.docker.com and runs it, which is what Docker's own instructions say to do."
+		return `Setup can install it for you now. It downloads Docker's own installer
+from get.docker.com and runs it — the same thing Docker's instructions
+tell you to do by hand. It takes a few minutes.`
 	case "winget":
-		return "Setup can install Docker Desktop for you using winget, Windows' own\n" +
-			"  package manager. It downloads it from Docker and installs it."
+		return `Setup can install it for you now, using winget, the app installer that
+comes with Windows. It downloads Docker Desktop from Docker and
+installs it. It takes several minutes.`
 	default:
 		return ""
 	}

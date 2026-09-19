@@ -95,20 +95,42 @@ func DNS(domain string) Result {
 
 	addrs, err := net.LookupHost(domain)
 	if err != nil {
-		res.Detail = fmt.Sprintf("%s does not resolve yet. This machine's public address is %s.", domain, public)
-		res.Remedy = fmt.Sprintf("At your domain registrar, add an A record for %s pointing to %s, then wait a few minutes.", domain, public)
+		res.Detail = fmt.Sprintf("%s does not lead anywhere yet.", domain)
+		res.Remedy = pointDomainHere(domain, public)
 		return res
 	}
 	for _, addr := range addrs {
 		if addr == public {
 			res.OK = true
-			res.Detail = "points at this machine (" + public + ")"
+			res.Detail = "already points at this computer (" + public + ")"
 			return res
 		}
 	}
-	res.Detail = fmt.Sprintf("%s currently points at %s, but this machine is %s.", domain, strings.Join(addrs, ", "), public)
-	res.Remedy = fmt.Sprintf("Update the A record for %s to %s. Until then the HTTPS certificate cannot be issued.", domain, public)
+	res.Detail = fmt.Sprintf("%s currently points somewhere else (%s), not at this computer.",
+		domain, strings.Join(addrs, ", "))
+	res.Remedy = pointDomainHere(domain, public)
 	return res
+}
+
+// pointDomainHere spells out the one change that has to be made, in the words
+// the registrar's own form uses, because "add an A record" means nothing to
+// somebody who has never seen that form before.
+func pointDomainHere(domain, public string) string {
+	return fmt.Sprintf(`A web address does not know where your site is until you tell it. You
+do that wherever you bought %s — GoDaddy, Namecheap, Cloudflare,
+whoever it was.
+
+Log in there and look for "DNS", "DNS settings" or "Manage DNS". Add a
+record with these three things:
+
+    Type:   A
+    Name:   @          (means the address itself, with nothing in front)
+    Value:  %s
+
+That value is this computer. Save it, and it usually takes effect within
+a few minutes, though it can take longer. Setup can carry on now — the
+site will start working by itself once the change goes through, and you
+do not have to run this again.`, domain, public)
 }
 
 // Disk warns when Docker has little room left. The images for the stack come
@@ -143,23 +165,50 @@ func publicIP() (string, error) {
 	return "", fmt.Errorf("no address service could be reached")
 }
 
+// WhatIsDocker is the one-paragraph answer, for the first time it comes up.
+const WhatIsDocker = `Docker is a free program that OmegaCases needs in order to run.
+It keeps the website and its database in their own self-contained
+boxes, so they cannot clash with anything else on this computer, and
+so removing them later leaves nothing behind. You install it once and
+never really think about it again.`
+
 func dockerInstallHint() string {
 	switch runtime.GOOS {
-	case "windows":
-		return "Install Docker Desktop from https://www.docker.com/products/docker-desktop/ then run this setup again."
-	case "darwin":
-		return "Install Docker Desktop from https://www.docker.com/products/docker-desktop/ then run this setup again."
+	case "windows", "darwin":
+		return `Download Docker Desktop — it is free — and install it:
+
+    https://www.docker.com/products/docker-desktop/
+
+Open it once after installing and wait until it says it is running.
+Then start this setup again.`
 	default:
-		return "Install it with:  curl -fsSL https://get.docker.com | sh    then run this setup again."
+		return `Install it by running this one line:
+
+    curl -fsSL https://get.docker.com | sudo sh
+
+Then start this setup again. (Setup can also do this for you — it
+offers, if you run it with sudo.)`
 	}
 }
 
 func dockerStartHint() string {
 	switch runtime.GOOS {
 	case "windows", "darwin":
-		return "Open Docker Desktop, wait until it says it is running, then run this setup again."
+		return `Docker is installed but not switched on yet.
+
+Open Docker Desktop from your Start menu or Applications folder and
+wait until it says it is running — a minute or two the first time.
+Then start this setup again.`
 	default:
-		return "Start it with:  sudo systemctl start docker    (and 'sudo usermod -aG docker $USER' if you get a permission error, then log out and back in)."
+		return `Docker is installed but not switched on yet. Start it with:
+
+    sudo systemctl start docker
+
+If that says permission denied, add yourself to the docker group:
+
+    sudo usermod -aG docker $USER
+
+then log out and back in, and start this setup again.`
 	}
 }
 

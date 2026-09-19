@@ -90,6 +90,18 @@ func Warn(format string, a ...any) {
 }
 func Fail(format string, a ...any) { fmt.Printf("  %s %s\n", c(red, "✗"), fmt.Sprintf(format, a...)) }
 
+// Block prints a multi-line explanation as one indented unit, so instructions
+// that run to several lines line up instead of only the first one being inset.
+func Block(text string) {
+	for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			fmt.Println()
+			continue
+		}
+		fmt.Printf("  %s\n", c(dim, line))
+	}
+}
+
 // Indented wraps a writer so streamed subprocess output is visibly nested
 // under the step that produced it.
 func Indented(w io.Writer) io.Writer { return &indentWriter{w: w} }

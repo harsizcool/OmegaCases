@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createNotification } from "@/lib/notifications"
+import { requireAdmin } from "@/lib/admin-auth"
 
 // Admin user management: look people up, and adjust balance, cases and Plus.
-//
-// Unlike the other admin routes, these require the caller's session token as
-// well as their id. The rest of the admin API only checks that the supplied
-// user_id belongs to an admin, which is enough when the worst outcome is an
-// edited item — but this endpoint creates balance out of nothing, and a user id
-// is not a secret. The token is, so it is what proves the request came from the
-// admin rather than from someone who saw their id.
+// Both handlers take the caller's session token, for the reasons in
+// requireAdmin — this endpoint creates balance out of nothing.
 
 const SELECT =
   "id, username, profile_picture, balance, zites_balance, cases_remaining, plus, admin, created_at"
@@ -38,32 +34,10 @@ function resolve(
   return { value: next }
 }
 
-/** Confirms the request came from a signed-in admin, and returns who that is. */
-async function authorize(actor_id: unknown, session_token: unknown) {
-  if (typeof actor_id !== "string" || typeof session_token !== "string" || !actor_id || !session_token) {
-    return { error: "Not signed in", status: 401 as const }
-  }
-
-  const supabase = await createClient()
-  const { data: actor } = await supabase
-    .from("users")
-    .select("id, username, admin, session_token")
-    .eq("id", actor_id)
-    .single()
-
-  if (!actor || actor.session_token !== session_token) {
-    return { error: "Not signed in", status: 401 as const }
-  }
-  if (!actor.admin) {
-    return { error: "Unauthorized", status: 403 as const }
-  }
-  return { actor, supabase }
-}
-
 // GET /api/admin/users?actor_id=&session_token=&q= — search, or the newest accounts.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const auth = await authorize(searchParams.get("actor_id"), searchParams.get("session_token"))
+  const auth = await requireAdmin(searchParams.get("actor_id"), searchParams.get("session_token"))
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
@@ -89,7 +63,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 })
 
-  const auth = await authorize(body.actor_id, body.session_token)
+  const auth = await requireAdmin(body.actor_id, body.session_token)
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }

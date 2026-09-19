@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Plus, Upload, Save, Loader2 } from "lucide-react"
+import { Plus, Upload, Save, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +14,7 @@ import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import { useRouter } from "next/navigation"
 import { UserManager } from "@/components/admin/user-manager"
+import { ItemEditor } from "@/components/admin/item-editor"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 
@@ -44,6 +45,7 @@ export default function AdminPage() {
   const router = useRouter()
   const [tab, setTab] = useState(0)
   const [items, setItems] = useState<Item[]>([])
+  const [editing, setEditing] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
 
   const RARITIES_LIST = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
@@ -300,8 +302,11 @@ export default function AdminPage() {
                           <TooltipContent>{item.name}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <p className="text-xs text-muted-foreground">{chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}</p>
+                      <p className="text-xs text-muted-foreground">{chance === 0 ? "out of pool" : chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}</p>
                       <p className="text-xs font-bold text-primary">${Number(item.market_price).toFixed(2)}</p>
+                      <Button size="sm" variant="outline" className="w-full mt-1.5 h-7 gap-1 text-xs" onClick={() => setEditing(item)}>
+                        <Pencil size={11} /> Edit
+                      </Button>
                     </div>
                   </div>
                 )
@@ -627,6 +632,15 @@ export default function AdminPage() {
 
       {/* Accounts tab */}
       {tab === 3 && <UserManager />}
+
+      {editing && (
+        <ItemEditor
+          item={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => setItems((current) => current.map((i) => (i.id === updated.id ? updated : i)))}
+          onDeleted={(id) => setItems((current) => current.filter((i) => i.id !== id))}
+        />
+      )}
     </div>
   )
 }
