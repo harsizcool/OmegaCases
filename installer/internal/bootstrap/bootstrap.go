@@ -118,6 +118,85 @@ func isGitRepo(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
+// IsGitCheckout reports whether the project can be updated in place.
+func IsGitCheckout(dir string) bool { return isGitRepo(dir) && runner.Look("git") }
+
+// Update pulls the latest code into an existing checkout and reports whether
+// anything changed, so the caller can skip a rebuild that would do nothing.
+//
+// Local edits are left alone: a fast-forward pull either applies cleanly or
+// fails, and failing is the right outcome. Nobody wants their own changes
+// merged away by an installer.
+func Update(r *runner.Runner, dir string) (changed bool, err error) {
+	if !IsGitCheckout(dir) {
+		return false, fmt.Errorf("%s is not a git checkout, so there is nothing to pull.\n"+
+			"  It was probably unpacked from a zip. Download the new code over it, or\n"+
+			"  install git and let setup clone it next time", dir)
+	}
+
+	before, err := headCommit(r, dir)
+	if err != nil {
+		return false, err
+	}
+
+	if out, err := r.Run("git", []string{"pull", "--ff-only"},
+		runner.In(dir), runner.Stream(), runner.Timeout(10*time.Minute)); err != nil {
+		if strings.Contains(out, "local changes") || strings.Contains(out, "would be overwritten") ||
+			strings.Contains(out, "not possible to fast-forward") {
+			return false, fmt.Errorf("the update was not applied because this copy has its own " +
+				"changes.\n  Commit or discard them first — setup will not overwrite your work")
+		}
+		return false, fmt.Errorf("could not fetch the new code: %w", err)
+	}
+
+	after, err := headCommit(r, dir)
+	if err != nil {
+		return false, err
+	}
+	if before == after {
+		return false, nil
+	}
+
+	// Worth showing: it says what the update actually brought in.
+	if log, err := r.Quiet("git", []string{"log", "--oneline", "--no-decorate",
+		before + ".." + after}, runner.In(dir), runner.Timeout(2*time.Minute)); err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(log), "\n") {
+			if line != "" {
+				ui.Say("      %s", ui.Dim(line))
+			}
+		}
+	}
+	return true, chownToUser(r, dir)
+}
+
+func headCommit(r *runner.Runner, dir string) (string, error) {
+	out, err := r.Quiet("git", []string{"rev-parse", "HEAD"},
+		runner.In(dir), runner.Timeout(2*time.Minute))
+	if err != nil {
+		return "", fmt.Errorf("could not read the current version of the code: %w", err)
+	}
+	return strings.TrimSpace(lastLineOf(out)), nil
+}
+
+func lastLineOf(s string) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// Describe returns a short description of the checked-out version, for showing
+// before and after an update.
+func Describe(r *runner.Runner, dir string) string {
+	if !IsGitCheckout(dir) {
+		return "not a git checkout"
+	}
+	out, err := r.Quiet("git", []string{"log", "-1", "--format=%h %s (%cr)"},
+		runner.In(dir), runner.Timeout(2*time.Minute))
+	if err != nil {
+		return "unknown"
+	}
+	return lastLineOf(out)
+}
+
 // ensureEmpty refuses to unpack over existing files, so a mistyped path cannot
 // scatter a checkout through somebody's documents.
 func ensureEmpty(dir string) error {

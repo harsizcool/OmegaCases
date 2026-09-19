@@ -132,7 +132,7 @@ func usage() {
   restart          Restart the site.
   status           Show what is running.
   logs [service]   Follow the logs.
-  update           Rebuild the site from the current source code.
+  update           Fetch the latest code, rebuild, migrate and restart.
   uninstall        Stop and remove everything, with a confirmation first.
   version          Print the version.
 
@@ -200,6 +200,17 @@ func install() error {
 
 	if err := checkPrerequisites(run); err != nil {
 		return err
+	}
+
+	// A machine that is already serving the site almost never wants to be set up
+	// again — it wants the new code. Asking beats assuming either way.
+	if existing, ok := config.Load(projectDir); ok {
+		if st := stack.New(existing, run); st.Running() {
+			handled, err := offerUpdate(existing, st, run)
+			if handled {
+				return err
+			}
+		}
 	}
 
 	ui.Section(2, totalSteps, "Your settings")
@@ -376,6 +387,111 @@ func locateOrFetchProject(run *runner.Runner) (string, error) {
 	}
 	ui.Done("source code ready at %s", dir)
 	return dir, nil
+}
+
+// offerUpdate is shown when the site is already running. It returns whether it
+// dealt with the run, so a "no, set it up again" answer falls through to the
+// ordinary install.
+func offerUpdate(cfg *config.Config, st *stack.Stack, run *runner.Runner) (bool, error) {
+	ui.Say("")
+	ui.Done("OmegaCases is already running here")
+	ui.Say("      %s", ui.Dim("address:  "+cfg.PublicURL()))
+	ui.Say("      %s", ui.Dim("code:     "+bootstrap.Describe(run, cfg.ProjectDir)))
+
+	choice := ui.Choice("What would you like to do?", []string{
+		"Update to the latest version\nFetches new code, rebuilds the site, applies any new database\nchanges, and restarts it. Your data and settings are kept.",
+		"Change a setting or an API key\nGoes through the questions again with your answers as defaults.",
+		"Nothing, just show me how it is doing",
+	}, 0)
+
+	switch choice {
+	case 0:
+		return true, runUpdate(cfg, st, run)
+	case 2:
+		ui.Say("")
+		if err := st.Status(); err != nil {
+			return true, err
+		}
+		ui.Say("")
+		ui.Say("  Address: %s", ui.Cyan(cfg.PublicURL()))
+		ui.Say("  %s", ui.Dim("Run this with 'logs' to follow what the site is doing."))
+		return true, nil
+	default:
+		// Fall through to the full install, which keeps the existing data and
+		// rewrites the configuration.
+		return false, nil
+	}
+}
+
+// runUpdate brings a running deployment up to the latest code.
+func runUpdate(cfg *config.Config, st *stack.Stack, run *runner.Runner) error {
+	ui.Section(1, 4, "Fetching the latest code")
+	changed, err := bootstrap.Update(run, cfg.ProjectDir)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		ui.Done("already up to date")
+		if !ui.Confirm("Rebuild anyway?", false) {
+			ui.Say("")
+			ui.Done("nothing to do — %s is serving the latest version", cfg.PublicURL())
+			return nil
+		}
+	} else {
+		ui.Done("new code fetched")
+	}
+
+	ui.Section(2, 4, "Rebuilding the site")
+	ui.Say("  %s", ui.Dim("Only what changed is rebuilt, so this is usually quick."))
+	ui.Say("")
+	if err := st.Build(); err != nil {
+		return fmt.Errorf("the new version could not be built, so the site is untouched "+
+			"and still running the old one: %w", err)
+	}
+	ui.Done("built")
+
+	// The database comes before the new site: a new release may need tables the
+	// old one did not have, and the migrations are written to be safe to re-run.
+	if cfg.DBMode == config.DBLocal {
+		ui.Section(3, 4, "Applying database changes")
+		if err := dbmigrate.Apply(st, filepath.Join(cfg.ProjectDir, "scripts")); err != nil {
+			return fmt.Errorf("the database could not be updated, so the site is still "+
+				"running the old version: %w", err)
+		}
+	} else {
+		ui.Section(3, 4, "Database changes")
+		ui.Say("  %s", ui.Dim("This install uses your own Supabase project, so setup does not"))
+		ui.Say("  %s", ui.Dim("change its tables. If this release added any, run the new files"))
+		ui.Say("  %s", ui.Dim("in scripts/ from the Supabase SQL editor."))
+	}
+
+	ui.Section(4, 4, "Switching over")
+	if err := st.UpService("web"); err != nil {
+		return fmt.Errorf("the new version could not be started: %w", err)
+	}
+	if err := st.WaitForSite(5 * time.Minute); err != nil {
+		ui.Say("")
+		ui.Say("  %s", ui.Dim(lastLines(st.Logs("web", 25), 15)))
+		return fmt.Errorf("the new version started but is not answering: %w", err)
+	}
+	ui.Done("the new version is live")
+
+	if cfg.DBMode == config.DBLocal {
+		if findings, err := dbmigrate.Verify(st); err == nil && len(findings) > 0 {
+			ui.Say("")
+			ui.Warn("The database is missing things this version expects:")
+			for _, finding := range findings {
+				ui.Say("      %s %s", ui.Yellow("·"), finding)
+			}
+		}
+	}
+
+	ui.Say("")
+	ui.Say("%s", ui.Bold(ui.Green("  Updated.")))
+	ui.Say("  %s  %s", ui.Bold("Your site:"), ui.Cyan(cfg.PublicURL()))
+	ui.Say("  %s", ui.Dim("now running: "+bootstrap.Describe(run, cfg.ProjectDir)))
+	ui.Say("")
+	return nil
 }
 
 func checkPrerequisites(run *runner.Runner) error {
@@ -710,20 +826,9 @@ func control(command, logsService string) error {
 		_, err := run.Run("docker", args, runner.Stream(), runner.In(cfg.StackDir()))
 		return err
 	case "update":
-		ui.Step("rebuilding the site from the current source code")
-		if err := st.Build(); err != nil {
-			return err
-		}
-		if err := st.UpService("web"); err != nil {
-			return err
-		}
-		if cfg.DBMode == config.DBLocal {
-			ui.Step("applying any new SQL scripts")
-			if err := dbmigrate.Apply(st, filepath.Join(cfg.ProjectDir, "scripts")); err != nil {
-				return err
-			}
-		}
-		ui.Done("updated — %s is serving the new version", cfg.PublicURL())
+		// The same work the guided run offers when it finds the site already up.
+		ui.Banner(version + " · build " + buildStamp)
+		return runUpdate(cfg, st, run)
 	}
 	return nil
 }
@@ -820,7 +925,7 @@ func printFinalInstructions(cfg *config.Config, logPath string) {
 		ui.Say("      See logs     %s", ui.Cyan("./omega-stack/omega.sh logs"))
 	}
 	ui.Say("      Is it up?    %s", ui.Cyan(binaryName()+" status"))
-	ui.Say("      New code     %s", ui.Cyan(binaryName()+" update"))
+	ui.Say("      Update it    %s", ui.Cyan(binaryName()+" update"))
 	ui.Say("")
 	ui.Say("  The site restarts by itself when this machine reboots, so there is")
 	ui.Say("  nothing to do after a power cut.")
@@ -886,7 +991,7 @@ site to be up; on Windows and macOS that means Docker Desktop is open.
 | Start the site           | %s |
 | Stop the site            | %s |
 | Check whether it is up   | `+"`%s status`"+`   |
-| Publish new code         | `+"`%s update`"+`   |
+| Get the latest version   | `+"`%s update`"+`   |
 
 The site starts itself again whenever this machine reboots.
 %s%s

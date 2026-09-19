@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
 import { useRouter } from "next/navigation"
+import { UserManager } from "@/components/admin/user-manager"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 
@@ -263,7 +264,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-border mb-6">
-        {["Items", "Add Item", "Settings"].map((label, i) => (
+        {["Items", "Add Item", "Settings", "Accounts"].map((label, i) => (
           <button
             key={label}
             onClick={() => setTab(i)}
@@ -623,6 +624,9 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Accounts tab */}
+      {tab === 3 && <UserManager />}
     </div>
   )
 }

@@ -196,6 +196,16 @@ func (s *Stack) Down() error {
 	return err
 }
 
+// Running reports whether this deployment's containers are up. It is how setup
+// tells a first install from a machine that is already serving the site.
+func (s *Stack) Running() bool {
+	if _, err := os.Stat(filepath.Join(s.cfg.StackDir(), "docker-compose.yml")); err != nil {
+		return false
+	}
+	out, err := s.compose([]string{"ps", "--quiet"}, runner.Timeout(2*time.Minute))
+	return err == nil && strings.TrimSpace(out) != ""
+}
+
 // Status prints the container table.
 func (s *Stack) Status() error {
 	_, err := s.compose([]string{"ps"}, runner.Stream(), runner.Timeout(2*time.Minute))
