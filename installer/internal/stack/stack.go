@@ -268,6 +268,69 @@ func (s *Stack) QuerySQL(query string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
+// CanLogIn reports whether a role can authenticate with the stack's password
+// over TCP, which is how the data services connect — not over the socket, where
+// the image may trust any local connection and prove nothing.
+func (s *Stack) CanLogIn(role string) bool {
+	_, err := s.compose(
+		[]string{"exec", "-T", "-e", "PGPASSWORD=" + s.cfg.PostgresPassword, "db",
+			"psql", "-h", "127.0.0.1", "-U", role, "-d", "postgres",
+			"--no-psqlrc", "-At", "-c", "SELECT 1"},
+		runner.Timeout(2*time.Minute),
+	)
+	return err == nil
+}
+
+// EnsureServiceLogins makes certain the roles the data services log in with have
+// the password this stack was generated with.
+//
+// The supabase/postgres image creates these roles but does not set their
+// passwords from POSTGRES_PASSWORD — that is done by an init script in
+// Supabase's own compose setup, which is not part of the image. Left unfixed,
+// PostgREST simply cannot connect, which surfaces much later as an unexplained
+// 502 from the data API.
+func (s *Stack) EnsureServiceLogins(roles ...string) error {
+	var unfixed []string
+
+	for _, role := range roles {
+		if s.CanLogIn(role) {
+			ui.Done("%s can sign in", role)
+			continue
+		}
+		ui.Step("setting the password for %s", role)
+
+		alter := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s;",
+			quoteIdent(role), sqlLiteral(s.cfg.PostgresPassword))
+
+		// Try as the role chosen for migrations, then explicitly as the image's
+		// superuser, which is the only role allowed to change a reserved one.
+		if _, err := s.ExecSQL(alter); err != nil && s.sqlUser() != "supabase_admin" {
+			s.run.Note("alter as %s failed (%v), retrying as supabase_admin", s.sqlUser(), err)
+			_, _ = s.compose(
+				[]string{"exec", "-T", "db", "psql", "-U", "supabase_admin", "-d", "postgres",
+					"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-c", alter},
+				runner.Timeout(2*time.Minute),
+			)
+		}
+
+		if s.CanLogIn(role) {
+			ui.Done("%s can sign in now", role)
+			continue
+		}
+		unfixed = append(unfixed, role)
+	}
+
+	if len(unfixed) > 0 {
+		return fmt.Errorf("these database roles cannot sign in with the stack's password: %s",
+			strings.Join(unfixed, ", "))
+	}
+	return nil
+}
+
+func quoteIdent(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+}
+
 // RestartDatabase is needed after the bootstrap script changes server-level
 // settings such as wal_level.
 func (s *Stack) RestartDatabase() error {

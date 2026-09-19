@@ -531,6 +531,33 @@ func setUpDatabase(cfg *config.Config, st *stack.Stack) error {
 		return err
 	}
 
+	// The data services sign in with passwords, and the image does not set them
+	// from this stack's, so they are checked and corrected before the services
+	// are restarted against them.
+	ui.Step("checking the data services can sign in to the database")
+
+	// Image uploads and live updates each break on their own if these cannot log
+	// in, but the site still works, so they are reported rather than fatal.
+	if err := st.EnsureServiceLogins("supabase_storage_admin"); err != nil {
+		ui.Warn("%s", err)
+		ui.Say("      %s", ui.Dim("Profile pictures and item images will not upload."))
+	}
+	if err := st.EnsureServiceLogins("supabase_admin"); err != nil {
+		ui.Warn("%s", err)
+		ui.Say("      %s", ui.Dim("Live feeds will need a page refresh to show new activity."))
+	}
+
+	// Nothing works without this one: it is the role every query travels over.
+	if err := st.EnsureServiceLogins("authenticator"); err != nil {
+		ui.Say("")
+		ui.Say("  %s", ui.Dim("The database is set up, but the services that read it cannot log in."))
+		ui.Say("  %s", ui.Dim("This is recoverable: deleting the database volume and running setup"))
+		ui.Say("  %s", ui.Dim("again rebuilds it from scratch with matching passwords —"))
+		ui.Say("      %s", ui.Cyan("cd omega-stack && docker compose down -v"))
+		ui.Say("  %s", ui.Dim("That deletes the site's data, so only do it on a fresh install."))
+		return err
+	}
+
 	// Storage and Realtime run their own migrations on connect, and both were
 	// started before these roles existed, so they get one restart here.
 	ui.Step("restarting the data services now the database is ready")

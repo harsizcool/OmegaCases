@@ -69,13 +69,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = entry[1]) THEN
       PERFORM pg_temp.omega_try(
         format('CREATE ROLE %I %s PASSWORD %L', entry[1], entry[2], pw));
-    ELSIF is_super THEN
-      -- Only worth attempting as a superuser. Where the image provisioned these
-      -- roles it used this same password, so there is nothing to correct.
-      PERFORM pg_temp.omega_try(
-        format('ALTER ROLE %I LOGIN PASSWORD %L', entry[1], pw));
     ELSE
-      RAISE NOTICE 'role % already exists and is managed by the image, left alone', entry[1];
+      -- The password has to be set even when the role already exists: the
+      -- image creates these roles but does not give them this stack's password,
+      -- and the data services log in with it. Attempted whether or not this
+      -- connection is a superuser, because the installer verifies the result
+      -- afterwards and repairs it if this was refused.
+      IF NOT pg_temp.omega_try(format('ALTER ROLE %I LOGIN PASSWORD %L', entry[1], pw))
+         AND NOT is_super THEN
+        RAISE NOTICE 'OMEGA_ROLE_PASSWORD_REFUSED: % (needs a superuser)', entry[1];
+      END IF;
     END IF;
   END LOOP;
 END
