@@ -501,15 +501,29 @@ func setUpDatabase(cfg *config.Config, st *stack.Stack) error {
 	}
 	ui.Done("database is up")
 
-	bootstrap, err := os.ReadFile(filepath.Join(cfg.StackDir(), "bootstrap.sql"))
+	// Named to avoid shadowing the bootstrap package.
+	bootstrapSQL, err := os.ReadFile(filepath.Join(cfg.StackDir(), "bootstrap.sql"))
 	if err != nil {
 		return err
 	}
 	ui.Step("preparing roles, schemas and replication")
-	if out, execErr := st.ExecSQL(string(bootstrap)); execErr != nil {
+	out, execErr := st.ExecSQL(string(bootstrapSQL))
+	if execErr != nil {
 		return fmt.Errorf("the database could not be prepared: %w\n%s", execErr, lastLines(out, 10))
 	}
 	ui.Done("database prepared")
+
+	// Turning on logical replication is a server-level change, so it only takes
+	// effect after a restart. The bootstrap script says when it made one.
+	if strings.Contains(out, "OMEGA_RESTART_REQUIRED") {
+		ui.Step("restarting the database to enable live updates")
+		if err := st.RestartDatabase(); err != nil {
+			ui.Warn("the restart failed: %s", err)
+			ui.Say("      %s", ui.Dim("Live feeds will need a page refresh until the database restarts."))
+		} else {
+			ui.Done("database restarted")
+		}
+	}
 
 	ui.Step("applying the project's SQL scripts")
 	scriptsDir := filepath.Join(cfg.ProjectDir, "scripts")

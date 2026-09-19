@@ -262,27 +262,46 @@ $mig$;
 -- lets the server evaluate the app's column filters (receiver_id=eq.…,
 -- type=eq.public) on updates and deletes as well as inserts.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- On a self-hosted Supabase stack the publication belongs to supabase_admin,
+-- and the role running migrations is not a superuser, so adding a table to it
+-- can be refused. Live feeds are worth having but not worth failing the whole
+-- migration over: a refusal is reported and the rest carries on. The installer
+-- prints which tables ended up published.
 DO $mig$
 DECLARE
   t TEXT;
   live TEXT[] := ARRAY['battles','messages','rolls','zites_trades','mining_blocks'];
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    CREATE PUBLICATION supabase_realtime;
+    BEGIN
+      CREATE PUBLICATION supabase_realtime;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'could not create the supabase_realtime publication: %', SQLERRM;
+      RETURN;
+    END;
   END IF;
 
   FOREACH t IN ARRAY live LOOP
-    IF EXISTS (
+    CONTINUE WHEN NOT EXISTS (
       SELECT 1 FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = t
-    ) THEN
+    );
+
+    BEGIN
       EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', t);
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_publication_tables
-        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t
-      ) THEN
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'could not set replica identity on %: %', t, SQLERRM;
+    END;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t
+    ) THEN
+      BEGIN
         EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
-      END IF;
+      EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'could not publish % for live updates: %', t, SQLERRM;
+      END;
     END IF;
   END LOOP;
 END
@@ -292,25 +311,36 @@ $mig$;
 -- Grants for the PostgREST roles. On a self-hosted stack these roles exist but
 -- own nothing, so without this the anon key sees an empty schema.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- A hosted Supabase project has these grants already; a self-hosted stack may
+-- not, and there the migrating role may not own the public schema either. Each
+-- grant is therefore attempted on its own and a refusal is reported.
 DO $mig$
+DECLARE
+  stmt TEXT;
+  statements TEXT[] := ARRAY[
+    'GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role',
+    'GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated',
+    'GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role',
+    'GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role',
+    'GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO service_role',
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon, authenticated',
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role',
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role'
+  ];
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
-    GRANT USAGE ON SCHEMA public TO anon;
-    GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
+  -- Nothing to grant to roles that do not exist: this database is not serving
+  -- PostgREST.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    RAISE NOTICE 'the anon role does not exist; skipping the API grants';
+    RETURN;
   END IF;
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    GRANT USAGE ON SCHEMA public TO authenticated;
-    GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO authenticated;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-    GRANT USAGE ON SCHEMA public TO service_role;
-    GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
-    GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
-    GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO service_role;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-  END IF;
+
+  FOREACH stmt IN ARRAY statements LOOP
+    BEGIN
+      EXECUTE stmt;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'skipped: % (%)', stmt, SQLERRM;
+    END;
+  END LOOP;
 END
 $mig$;

@@ -32,6 +32,9 @@ var templates embed.FS
 type Stack struct {
 	cfg *config.Config
 	run *runner.Runner
+
+	// dbUser is the role psql connects as, resolved once on first use.
+	dbUser string
 }
 
 // New binds a stack to its config and command runner.
@@ -219,11 +222,35 @@ func (s *Stack) WaitForDatabase(limit time.Duration) error {
 	}
 }
 
-// ExecSQL runs a script against the database as the superuser, reporting the
-// first error rather than pressing on, so a broken migration is visible.
+// sqlUser picks the role to run migrations as.
+//
+// On the Supabase image the postgres role is deliberately not a superuser, and
+// roles such as authenticator are marked reserved, so altering them from
+// postgres is refused. supabase_admin is the superuser there. Where it cannot be
+// reached — a plain postgres image, or an image that authenticates it
+// differently — postgres is used and the scripts fall back to skipping what they
+// are not allowed to do.
+func (s *Stack) sqlUser() string {
+	if s.dbUser != "" {
+		return s.dbUser
+	}
+	s.dbUser = "postgres"
+	if out, err := s.compose(
+		[]string{"exec", "-T", "db", "psql", "-U", "supabase_admin", "-d", "postgres",
+			"--no-psqlrc", "-At", "-c", "SELECT current_setting('is_superuser')"},
+		runner.Timeout(2*time.Minute),
+	); err == nil && lastLine(out) == "on" {
+		s.dbUser = "supabase_admin"
+	}
+	s.run.Note("running SQL as %s", s.dbUser)
+	return s.dbUser
+}
+
+// ExecSQL runs a script against the database, reporting the first error rather
+// than pressing on, so a broken migration is visible.
 func (s *Stack) ExecSQL(sql string) (string, error) {
 	return s.compose(
-		[]string{"exec", "-T", "db", "psql", "-U", "postgres", "-d", "postgres",
+		[]string{"exec", "-T", "db", "psql", "-U", s.sqlUser(), "-d", "postgres",
 			"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-f", "-"},
 		runner.Stdin(strings.NewReader(sql)),
 		runner.Timeout(10*time.Minute),
@@ -234,7 +261,7 @@ func (s *Stack) ExecSQL(sql string) (string, error) {
 // which keeps parsing on the Go side trivial.
 func (s *Stack) QuerySQL(query string) (string, error) {
 	out, err := s.compose(
-		[]string{"exec", "-T", "db", "psql", "-U", "postgres", "-d", "postgres",
+		[]string{"exec", "-T", "db", "psql", "-U", s.sqlUser(), "-d", "postgres",
 			"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-At", "-c", query},
 		runner.Timeout(2*time.Minute),
 	)
