@@ -18,6 +18,11 @@ services:
       JWT_EXP: 315360000
     volumes:
       - db-data:/var/lib/postgresql/data
+      # Runs once, while the database is created, as the bootstrap superuser.
+      # That is the only point at which the service roles can be given this
+      # stack's password: afterwards the image runs as a non-superuser and
+      # refuses to alter them.
+      - ./init-roles.sql:/docker-entrypoint-initdb.d/99-omega-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
       interval: 5s

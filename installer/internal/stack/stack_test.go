@@ -45,13 +45,29 @@ func TestWriteDomainStack(t *testing.T) {
 	dir := writeStack(t, cfg)
 
 	for _, name := range []string{
-		"docker-compose.yml", "Caddyfile", "bootstrap.sql", ".env",
+		"docker-compose.yml", "Caddyfile", "bootstrap.sql", "init-roles.sql", ".env",
 		"Dockerfile.web", "Dockerfile.web.dockerignore",
 		"start.cmd", "stop.cmd", "omega.sh",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Errorf("%s was not written", name)
 		}
+	}
+
+	// The service roles' passwords can only be set while the database is being
+	// created, so this file has to be mounted where PostgreSQL will run it and
+	// has to carry the password the services will use.
+	init := read(t, dir, "init-roles.sql")
+	if !strings.Contains(init, "'"+cfg.PostgresPassword+"'") {
+		t.Error("init-roles.sql does not set this stack's password")
+	}
+	for _, role := range []string{"authenticator", "supabase_storage_admin", "supabase_admin"} {
+		if !strings.Contains(init, role) {
+			t.Errorf("init-roles.sql does not provision %s", role)
+		}
+	}
+	if !strings.Contains(read(t, dir, "docker-compose.yml"), "/docker-entrypoint-initdb.d/") {
+		t.Error("init-roles.sql is not mounted where PostgreSQL will run it")
 	}
 
 	compose := read(t, dir, "docker-compose.yml")

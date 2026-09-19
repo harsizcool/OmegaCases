@@ -8,7 +8,16 @@ set -euo pipefail
 
 VERSION="${VERSION:-1.0.0}"
 OUT="$(pwd)/dist"
-LDFLAGS="-s -w -X main.version=${VERSION}"
+
+# A stamp of when and from what this was built, so a report of what a binary did
+# can be tied to the source it came from. The version number alone cannot do
+# that: it does not change between builds.
+STAMP="$(date -u +%Y%m%d-%H%M)"
+if COMMIT="$(git rev-parse --short HEAD 2>/dev/null)"; then
+  STAMP="${STAMP}-${COMMIT}"
+fi
+
+LDFLAGS="-s -w -X main.version=${VERSION} -X main.buildStamp=${STAMP}"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"

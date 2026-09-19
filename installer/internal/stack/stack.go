@@ -77,6 +77,9 @@ func (s *Stack) Write() error {
 		{"docker-compose.yml.tmpl", "docker-compose.yml", 0o644},
 		{"Caddyfile.tmpl", "Caddyfile", 0o644},
 		{"bootstrap.sql.tmpl", "bootstrap.sql", 0o600},
+		// Readable by the postgres user inside the container, which is a
+		// different uid, so this one cannot be 0600.
+		{"init-roles.sql.tmpl", "init-roles.sql", 0o644},
 		{"start.cmd.tmpl", "start.cmd", 0o755},
 		{"stop.cmd.tmpl", "stop.cmd", 0o755},
 		{"omega.sh.tmpl", "omega.sh", 0o755},
@@ -269,12 +272,16 @@ func (s *Stack) QuerySQL(query string) (string, error) {
 }
 
 // CanLogIn reports whether a role can authenticate with the stack's password
-// over TCP, which is how the data services connect — not over the socket, where
-// the image may trust any local connection and prove nothing.
+// the same way the data services do.
+//
+// The host has to be the service name. A connection to localhost or 127.0.0.1
+// matches the "trust" rules that initdb writes into pg_hba.conf for loopback,
+// which succeed whatever the password is and prove nothing; the services reach
+// the database as "db", over a rule that actually demands the password.
 func (s *Stack) CanLogIn(role string) bool {
 	_, err := s.compose(
 		[]string{"exec", "-T", "-e", "PGPASSWORD=" + s.cfg.PostgresPassword, "db",
-			"psql", "-h", "127.0.0.1", "-U", role, "-d", "postgres",
+			"psql", "-h", "db", "-U", role, "-d", "postgres",
 			"--no-psqlrc", "-At", "-c", "SELECT 1"},
 		runner.Timeout(2*time.Minute),
 	)
@@ -302,18 +309,42 @@ func (s *Stack) EnsureServiceLogins(roles ...string) error {
 		alter := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s;",
 			quoteIdent(role), sqlLiteral(s.cfg.PostgresPassword))
 
-		// Try as the role chosen for migrations, then explicitly as the image's
-		// superuser, which is the only role allowed to change a reserved one.
-		if _, err := s.ExecSQL(alter); err != nil && s.sqlUser() != "supabase_admin" {
-			s.run.Note("alter as %s failed (%v), retrying as supabase_admin", s.sqlUser(), err)
-			_, _ = s.compose(
-				[]string{"exec", "-T", "db", "psql", "-U", "supabase_admin", "-d", "postgres",
-					"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-c", alter},
-				runner.Timeout(2*time.Minute),
-			)
+		// Only a superuser may change a reserved role, and which connection gets
+		// one depends on how the image was built, so each route is tried in turn.
+		// A fresh database does not come through here at all: init-roles.sql sets
+		// these passwords while the database is being created.
+		attempts := [][]string{
+			// Whatever migrations run as.
+			nil,
+			// The image's superuser over TCP. Its password is the one initdb was
+			// given, which is this same POSTGRES_PASSWORD.
+			{"exec", "-T", "-e", "PGPASSWORD=" + s.cfg.PostgresPassword, "db",
+				"psql", "-h", "db", "-U", "supabase_admin", "-d", "postgres",
+				"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-c", alter},
+			// The same role over the local socket, for images that trust it.
+			{"exec", "-T", "db", "psql", "-U", "supabase_admin", "-d", "postgres",
+				"-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-c", alter},
 		}
 
-		if s.CanLogIn(role) {
+		fixed := false
+		for _, args := range attempts {
+			var err error
+			if args == nil {
+				_, err = s.ExecSQL(alter)
+			} else {
+				_, err = s.compose(args, runner.Timeout(2*time.Minute))
+			}
+			if err != nil {
+				s.run.Note("could not set %s's password on this attempt: %v", role, err)
+				continue
+			}
+			if s.CanLogIn(role) {
+				fixed = true
+				break
+			}
+		}
+
+		if fixed {
 			ui.Done("%s can sign in now", role)
 			continue
 		}

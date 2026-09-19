@@ -31,8 +31,13 @@ import (
 	"github.com/harsizcool/omegacases/installer/internal/wizard"
 )
 
-// version is stamped at build time with -ldflags "-X main.version=…".
-var version = "1.0.0"
+// version and buildStamp are set at build time with
+// -ldflags "-X main.version=… -X main.buildStamp=…". The stamp is what tells a
+// bug report which binary actually ran, which a version number alone does not.
+var (
+	version    = "1.0.0"
+	buildStamp = "dev"
+)
 
 const totalSteps = 7
 
@@ -61,7 +66,8 @@ func main() {
 	case "uninstall", "remove":
 		exit(uninstall())
 	case "version", "v":
-		fmt.Printf("omegacases-setup %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("omegacases-setup %s (build %s, %s/%s)\n",
+			version, buildStamp, runtime.GOOS, runtime.GOARCH)
 	case "help", "h", "?":
 		usage()
 	default:
@@ -161,7 +167,7 @@ func holdWindow() {
 // ─── install ────────────────────────────────────────────────────────────────
 
 func install() error {
-	ui.Banner(version)
+	ui.Banner(version + " · build " + buildStamp)
 	ui.Say("  This will set up the OmegaCases website on this machine: the database,")
 	ui.Say("  the site itself, and an HTTPS address to reach it on. It takes about")
 	ui.Say("  ten minutes, most of which is downloading and building.")
@@ -189,7 +195,8 @@ func install() error {
 		return err
 	}
 	defer run.Close()
-	run.Note("setup %s on %s/%s, project %s", version, runtime.GOOS, runtime.GOARCH, projectDir)
+	run.Note("setup %s (build %s) on %s/%s, project %s",
+		version, buildStamp, runtime.GOOS, runtime.GOARCH, projectDir)
 
 	if err := checkPrerequisites(run); err != nil {
 		return err
