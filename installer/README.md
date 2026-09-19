@@ -27,25 +27,29 @@ creates the database itself.
 
 ## Running it
 
+There is nothing to install: each file in `dist/` is one self-contained binary.
+
 **Windows** — double-click `SETUP.EXE`. It can sit anywhere: in the project
 folder if you already have the code, or on your desktop if you do not.
 
-**Debian or Ubuntu**
+**Linux**
 
 ```
-sudo dpkg -i omegacases-setup_1.0.0_amd64.deb
-sudo omegacases-setup
+chmod +x omegacases-setup-linux
+sudo ./omegacases-setup-linux
 ```
 
-`sudo` is needed because the proxy binds ports 80 and 443 (and because
-installing Docker needs root). Run it from inside the project folder if you
-already have the code; from anywhere if you want setup to download it.
+Use `omegacases-setup-linux-arm64` on ARM machines. `sudo` is needed because the
+proxy binds ports 80 and 443, and installing Docker needs root.
+
+Run it from inside the project folder if you already have the code, or from
+anywhere if you want setup to download it.
 
 Two options apply to the whole run:
 
 ```
 --dir PATH       where the code is, or should be downloaded to
---branch NAME    which branch to download (default: main)
+--branch NAME    which branch to download (default: release)
 ```
 
 Setup asks about a dozen questions, all with sensible defaults, then does the
@@ -116,7 +120,7 @@ update by themselves.
 
 ```
 cd installer
-bash ./build.sh          # SETUP.EXE, the Linux binaries, and the .deb
+bash ./build.sh          # SETUP.EXE and the Linux binaries
 ```
 
 or on Windows, for the executables only:

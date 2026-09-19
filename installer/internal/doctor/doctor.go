@@ -166,20 +166,31 @@ func dockerStartHint() string {
 // WaitForDocker polls until the engine answers. Docker Desktop takes a minute
 // or two to start, and "it is installed but not responding" is far more often a
 // machine that has just booted than a broken installation.
+// The engine is polled often so setup carries on promptly once it is up, but
+// onTick only fires occasionally — a line every few seconds for three minutes
+// buries the message that follows it.
 func WaitForDocker(r *runner.Runner, limit time.Duration, onTick func(waited time.Duration)) bool {
-	deadline := time.Now().Add(limit)
+	const (
+		poll   = 5 * time.Second
+		notify = 30 * time.Second
+	)
 	started := time.Now()
+	deadline := started.Add(limit)
+	nextNotice := started.Add(notify)
+
 	for {
 		if _, err := r.Quiet("docker", []string{"info", "--format", "{{.ServerVersion}}"},
 			runner.Timeout(30*time.Second)); err == nil {
 			return true
 		}
-		if time.Now().After(deadline) {
+		now := time.Now()
+		if now.After(deadline) {
 			return false
 		}
-		if onTick != nil {
+		if onTick != nil && now.After(nextNotice) {
 			onTick(time.Since(started).Round(time.Second))
+			nextNotice = now.Add(notify)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(poll)
 	}
 }

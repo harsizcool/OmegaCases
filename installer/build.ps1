@@ -1,5 +1,5 @@
-# Builds the setup program on Windows. The .deb is produced by build.sh, which
-# needs a POSIX shell — Git Bash is enough:  bash ./build.sh
+# Builds the setup program on Windows. build.sh builds every platform at once
+# and needs a POSIX shell — Git Bash is enough:  bash ./build.sh
 param([string]$Version = "1.0.0")
 
 $ErrorActionPreference = "Stop"
