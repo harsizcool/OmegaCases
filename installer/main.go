@@ -63,6 +63,8 @@ func main() {
 		exit(install())
 	case "start", "stop", "restart", "status", "logs", "update":
 		exit(control(command, logsArg(args)))
+	case "check", "doctor", "diagnose":
+		exit(diagnose())
 	case "uninstall", "remove":
 		exit(uninstall())
 	case "version", "v":
@@ -132,6 +134,7 @@ func usage() {
   restart          Restart the site.
   status           Show what is running.
   logs [service]   Follow the logs.
+  check            Find out why something is not working, step by step.
   update           Fetch the latest code, rebuild, migrate and restart.
   uninstall        Stop and remove everything, with a confirmation first.
   version          Print the version.
@@ -849,6 +852,60 @@ func control(command, logsService string) error {
 		ui.Banner(version + " · build " + buildStamp)
 		return runUpdate(cfg, st, run)
 	}
+	return nil
+}
+
+// diagnose works through the site part by part and says which one is at fault,
+// because from a browser every kind of breakage looks the same.
+func diagnose() error {
+	cfg, st, run, err := openExisting()
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	ui.Banner(version + " · build " + buildStamp)
+	ui.Say("  Checking the site at %s", ui.Cyan(cfg.PublicURL()))
+	ui.Say("  %s", ui.Dim("Each part is tested in the order the site depends on it."))
+	ui.Say("")
+
+	checks := st.Diagnose()
+
+	var failed []stack.Check
+	for _, check := range checks {
+		if check.OK {
+			ui.Done("%s — %s", check.Name, check.Detail)
+			continue
+		}
+		ui.Fail("%s — %s", check.Name, check.Detail)
+		failed = append(failed, check)
+	}
+
+	if len(failed) == 0 {
+		ui.Say("")
+		ui.Say("%s", ui.Bold(ui.Green("  Everything works, including creating an account.")))
+		ui.Say("  %s", ui.Dim("If something still looks wrong in the browser, it is in the site"))
+		ui.Say("  %s", ui.Dim("itself rather than the setup. 'logs web' will show the error."))
+		ui.Say("")
+		return nil
+	}
+
+	ui.Say("")
+	ui.Say("%s", ui.Bold("What to do:"))
+	for _, check := range failed {
+		if check.Hint == "" {
+			continue
+		}
+		ui.Say("")
+		ui.Say("  %s", ui.Bold(check.Name))
+		ui.Block(check.Hint)
+	}
+	ui.Say("")
+	ui.Say("  %s", ui.Dim("Full detail of this check: "+filepath.Base(run.LogPath())))
+	ui.Say("")
+
+	// Not an error in itself: the checks ran and reported. Exiting non-zero
+	// would make a scripted health check treat a reported fault as a crash.
 	return nil
 }
 

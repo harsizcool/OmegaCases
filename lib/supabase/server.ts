@@ -22,8 +22,37 @@ function internalFetch(input: RequestInfo | URL, init?: RequestInit) {
   return fetch(input as RequestInfo, init)
 }
 
+// A request from this process to its own address cannot work, and the failure
+// that follows is a confusing one — a 404 of HTML where JSON was expected. When
+// the setup looks like that, say so once, plainly, in the server log.
+//
+// It is only a warning, not a refusal: the same address does work from outside a
+// container, where the proxy in front of the site answers these paths, which is
+// the case when running the site directly with npm.
+let warned = false
+function warnIfUnreachable() {
+  if (warned || INTERNAL_URL) return
+  warned = true
+  const host = (() => {
+    try {
+      return new URL(PUBLIC_URL).hostname
+    } catch {
+      return ""
+    }
+  })()
+  if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1") return
+
+  console.warn(
+    `[omegacases] SUPABASE_INTERNAL_URL is not set, so this server will look for ` +
+      `its data at ${PUBLIC_URL} — its own address. Inside a container nothing ` +
+      `answers there, and signing up, logging in and every other write will fail. ` +
+      `Run "setup update" to rebuild with the current settings.`
+  )
+}
+
 // Use service role key for server-side API routes — bypasses RLS cookie issues
 export function createClient() {
+  warnIfUnreachable()
   return createSupabaseClient(
     PUBLIC_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
