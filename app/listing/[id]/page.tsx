@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
 import { RARITY_COLORS } from "@/lib/types"
+import { DEFAULT_BUYER_PROTECTION_RATE, applyBuyerProtection } from "@/lib/game-settings-shared"
 import type { Listing, Sale, Rarity } from "@/lib/types"
 
 const SalesPriceChart = dynamic(() => import("@/components/sales-price-chart"), { ssr: false })
@@ -27,6 +28,7 @@ export default function ListingPage() {
   const [buying, setBuying] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [protectionRate, setProtectionRate] = useState(DEFAULT_BUYER_PROTECTION_RATE)
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -44,6 +46,18 @@ export default function ListingPage() {
     }
     fetchListing()
   }, [id])
+
+  // The fee an admin has configured, so the total shown here is the total
+  // charged. Falls back to the default if the settings cannot be read.
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        const rate = Number(data?.buyer_protection_rate)
+        if (Number.isFinite(rate) && rate >= 0 && rate <= 0.5) setProtectionRate(rate)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleBuy = async () => {
     if (!listing || !user) return
@@ -220,19 +234,56 @@ export default function ListingPage() {
               <Button variant="outline" className="w-full" disabled>Your Listing</Button>
             ) : (
               <div className="flex flex-col gap-1">
-                <p className="text-xs text-muted-foreground">Your balance: ${Number(user.balance).toFixed(2)}</p>
-                <Button
-                  className="w-full gap-2"
-                  size="lg"
-                  onClick={handleBuy}
-                  disabled={buying || Number(user?.balance) < listing.price}
-                >
-                  {buying ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
-                  {buying ? "Buying..." : `Buy for $${Number(listing.price).toFixed(2)}`}
-                </Button>
-                {Number(user?.balance) < listing.price && (
-                  <p className="text-xs text-destructive text-center">Insufficient balance</p>
-                )}
+                {(() => {
+                  const { fee, total } = applyBuyerProtection(Number(listing.price), protectionRate)
+                  const short = Number(user?.balance) < total
+                  return (
+                    <>
+                      {fee > 0 && (
+                        <div className="text-xs text-muted-foreground flex flex-col gap-0.5 mb-1">
+                          <div className="flex justify-between">
+                            <span>Item</span>
+                            <span>${Number(listing.price).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="underline decoration-dotted cursor-help">
+                                    Buyer protection ({(protectionRate * 100).toFixed(protectionRate * 100 % 1 === 0 ? 0 : 1)}%)
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Covers the marketplace on this purchase. The seller still
+                                  receives the full asking price.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <span>${fee.toFixed(2)}</span>
+                          </div>
+                          <Separator className="my-1" />
+                          <div className="flex justify-between font-semibold text-foreground">
+                            <span>Total</span>
+                            <span>${total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">Your balance: ${Number(user.balance).toFixed(2)}</p>
+                      <Button
+                        className="w-full gap-2"
+                        size="lg"
+                        onClick={handleBuy}
+                        disabled={buying || short}
+                      >
+                        {buying ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
+                        {buying ? "Buying..." : `Buy for $${total.toFixed(2)}`}
+                      </Button>
+                      {short && (
+                        <p className="text-xs text-destructive text-center">Insufficient balance</p>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             )
           )}

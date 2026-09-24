@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createNotification } from "@/lib/notifications"
+import { applyBuyerProtection, getBuyerProtectionRate } from "@/lib/game-settings"
 
 export async function POST(
   request: Request,
@@ -29,14 +30,36 @@ export async function POST(
     .single()
 
   if (!buyer) return NextResponse.json({ error: "Buyer not found" }, { status: 404 })
-  if (Number(buyer.balance) < listing.price) {
-    return NextResponse.json({ error: "Insufficient balance" }, { status: 402 })
+
+  // Buyer protection: the buyer pays this on top of the asking price, and the
+  // seller still receives the full amount they listed it for. The rate is read
+  // per purchase rather than captured anywhere, so a change an admin makes
+  // applies to the next sale.
+  const rate = await getBuyerProtectionRate()
+  const { fee, total, sellerReceives } = applyBuyerProtection(Number(listing.price), rate)
+
+  if (Number(buyer.balance) < total) {
+    return NextResponse.json(
+      {
+        error:
+          fee > 0
+            ? `Insufficient balance — this costs $${total.toFixed(2)} including $${fee.toFixed(
+                2
+              )} buyer protection`
+            : "Insufficient balance",
+        price: sellerReceives,
+        buyer_protection_fee: fee,
+        total,
+      },
+      { status: 402 }
+    )
   }
 
-  // Transfer balance (no fee on P2P trades)
+  // The buyer pays the total; the fee is the difference between that and what
+  // the seller is credited, so it stays with the site.
   await supabase
     .from("users")
-    .update({ balance: Number(buyer.balance) - listing.price })
+    .update({ balance: Math.round((Number(buyer.balance) - total) * 100) / 100 })
     .eq("id", buyer_id)
 
   const { data: seller } = await supabase
@@ -47,7 +70,7 @@ export async function POST(
 
   await supabase
     .from("users")
-    .update({ balance: Number(seller!.balance) + listing.price })
+    .update({ balance: Math.round((Number(seller!.balance) + sellerReceives) * 100) / 100 })
     .eq("id", listing.seller_id)
 
   // Transfer inventory
@@ -108,7 +131,12 @@ export async function POST(
       .eq("id", listing.item_id)
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({
+    success: true,
+    price: sellerReceives,
+    buyer_protection_fee: fee,
+    total,
+  })
 }
 
 // PATCH: Edit listing price (enforces 60s cooldown server-side)

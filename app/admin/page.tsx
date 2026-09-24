@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Plus, Upload, Save, Loader2 } from "lucide-react"
+import { Plus, Upload, Save, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +12,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/lib/auth-context"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
+import { DEFAULT_BUYER_PROTECTION_RATE, MAX_BUYER_PROTECTION_RATE } from "@/lib/game-settings-shared"
 import { useRouter } from "next/navigation"
+import { UserManager } from "@/components/admin/user-manager"
+import { ItemEditor } from "@/components/admin/item-editor"
+import { SupportPanel } from "@/components/admin/support-panel"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 
@@ -43,6 +47,7 @@ export default function AdminPage() {
   const router = useRouter()
   const [tab, setTab] = useState(0)
   const [items, setItems] = useState<Item[]>([])
+  const [editing, setEditing] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
 
   const RARITIES_LIST = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
@@ -73,6 +78,11 @@ export default function AdminPage() {
   const [arcadeSuccess, setArcadeSuccess] = useState(false)
   const [arcadeError, setArcadeError] = useState("")
 
+  const [protectionRate, setProtectionRate] = useState(String(DEFAULT_BUYER_PROTECTION_RATE * 100))
+  const [bpSaving, setBpSaving] = useState(false)
+  const [bpSuccess, setBpSuccess] = useState(false)
+  const [bpError, setBpError] = useState("")
+
   const [paymentsPaused, setPaymentsPaused] = useState(true)
   const [ppSaving, setPpSaving] = useState(false)
   const [ppSuccess, setPpSuccess] = useState(false)
@@ -91,6 +101,25 @@ export default function AdminPage() {
       setPaymentsPaused(val)
       setPpSuccess(true)
     } catch (e: any) { setPpError(e.message) } finally { setPpSaving(false) }
+  }
+
+  // Stored as a fraction, entered as a percentage: 5 in the box means 0.05.
+  const saveBuyerProtection = async () => {
+    setBpSaving(true); setBpError(""); setBpSuccess(false)
+    try {
+      if (!user?.id) throw new Error("Not authenticated")
+      const pct = parseFloat(protectionRate)
+      if (!Number.isFinite(pct) || pct < 0 || pct > MAX_BUYER_PROTECTION_RATE * 100) {
+        throw new Error(`Enter a percentage between 0 and ${MAX_BUYER_PROTECTION_RATE * 100}`)
+      }
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "buyer_protection_rate", value: pct / 100, user_id: user.id }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error || "Failed") }
+      setBpSuccess(true)
+    } catch (e: any) { setBpError(e.message) } finally { setBpSaving(false) }
   }
 
   const saveCasePrices = async () => {
@@ -162,6 +191,9 @@ export default function AdminPage() {
       if (data.arcade_house_edge !== undefined) setArcadeHouseEdge(String(data.arcade_house_edge))
       if (data.arcade_min_bet !== undefined) setArcadeMinBet(String(data.arcade_min_bet))
       if (data.arcade_max_bet !== undefined) setArcadeMaxBet(String(data.arcade_max_bet))
+      if (data.buyer_protection_rate !== undefined) {
+        setProtectionRate(String(Number(data.buyer_protection_rate) * 100))
+      }
     } catch {}
     setCapsLoading(false)
   }
@@ -263,7 +295,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-border mb-6">
-        {["Items", "Add Item", "Settings"].map((label, i) => (
+        {["Items", "Add Item", "Settings", "Accounts", "Support"].map((label, i) => (
           <button
             key={label}
             onClick={() => setTab(i)}
@@ -299,8 +331,11 @@ export default function AdminPage() {
                           <TooltipContent>{item.name}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <p className="text-xs text-muted-foreground">{chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}</p>
+                      <p className="text-xs text-muted-foreground">{chance === 0 ? "out of pool" : chance < 0.1 ? `1 in ${oneInVal.toLocaleString()}` : `${chance}%`}</p>
                       <p className="text-xs font-bold text-primary">${Number(item.market_price).toFixed(2)}</p>
+                      <Button size="sm" variant="outline" className="w-full mt-1.5 h-7 gap-1 text-xs" onClick={() => setEditing(item)}>
+                        <Pencil size={11} /> Edit
+                      </Button>
                     </div>
                   </div>
                 )
@@ -456,6 +491,46 @@ export default function AdminPage() {
             </div>
             {ppError && <Alert variant="destructive" className="mt-2"><AlertDescription>{ppError}</AlertDescription></Alert>}
             {ppSuccess && <Alert className="mt-2"><AlertDescription className="text-green-600">Payments setting saved!</AlertDescription></Alert>}
+          </div>
+
+          {/* Buyer protection fee */}
+          <div>
+            <h3 className="text-sm font-bold mb-1">Buyer Protection Fee</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Added on top of the price when someone buys a marketplace listing. The seller still
+              receives the full amount they asked for; this part goes to the site. Set it to 0 to
+              charge nothing.
+            </p>
+            <div className="flex items-end gap-2 flex-wrap">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">Fee (%)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    step={0.1}
+                    min={0}
+                    max={MAX_BUYER_PROTECTION_RATE * 100}
+                    value={protectionRate}
+                    onChange={e => setProtectionRate(e.target.value)}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+              <Button className="gap-2" disabled={bpSaving} onClick={saveBuyerProtection}>
+                {bpSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {bpSaving ? "Saving..." : "Save Fee"}
+              </Button>
+            </div>
+            <p className="text-[0.7rem] text-muted-foreground mt-2">
+              On a $10.00 listing a buyer pays{" "}
+              <strong className="text-foreground">
+                ${(10 + 10 * (parseFloat(protectionRate || "0") / 100)).toFixed(2)}
+              </strong>
+              , of which ${(10 * (parseFloat(protectionRate || "0") / 100)).toFixed(2)} is the fee.
+            </p>
+            {bpError && <Alert variant="destructive" className="mt-2"><AlertDescription>{bpError}</AlertDescription></Alert>}
+            {bpSuccess && <Alert className="mt-2"><AlertDescription className="text-green-600">Buyer protection fee saved!</AlertDescription></Alert>}
           </div>
 
           {/* Rarity price caps */}
@@ -622,6 +697,21 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Accounts tab */}
+      {tab === 3 && <UserManager />}
+
+      {/* Support tab */}
+      {tab === 4 && <SupportPanel />}
+
+      {editing && (
+        <ItemEditor
+          item={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => setItems((current) => current.map((i) => (i.id === updated.id ? updated : i)))}
+          onDeleted={(id) => setItems((current) => current.filter((i) => i.id !== id))}
+        />
       )}
     </div>
   )
