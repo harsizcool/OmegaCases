@@ -734,7 +734,8 @@ func verifyDeployment(cfg *config.Config, st *stack.Stack, run *runner.Runner) e
 
 		if err := st.EnsureBuckets("avatars", "itemstuffs"); err != nil {
 			ui.Warn("%s", err)
-			ui.Say("      %s", ui.Dim("Profile pictures and item images will fail to upload until this works."))
+			ui.Say("      %s", ui.Dim("Profile pictures and item images will not work until this does."))
+			ui.Say("      %s", ui.Dim("Everything else is unaffected. To see why, run: "+binaryName()+" check"))
 		}
 
 		findings, err := dbmigrate.Verify(st)

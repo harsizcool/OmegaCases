@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { CASE_PRICES } from "@/lib/types"
+import {
+  DEFAULT_BUYER_PROTECTION_RATE,
+  MAX_BUYER_PROTECTION_RATE,
+} from "@/lib/game-settings-shared"
 
 export const DEFAULT_RARITY_CAPS: Record<string, number> = {
   Common: 0.04,
@@ -62,4 +66,33 @@ export async function getBannerSettings(): Promise<BannerSettings> {
     }
   } catch {}
   return null
+}
+
+export {
+  DEFAULT_BUYER_PROTECTION_RATE,
+  MAX_BUYER_PROTECTION_RATE,
+  applyBuyerProtection,
+} from "@/lib/game-settings-shared"
+
+/**
+ * Reads the buyer protection rate an admin has set, falling back to the default.
+ * A missing or nonsense value must not silently become a 0% or absurd fee.
+ */
+export async function getBuyerProtectionRate(): Promise<number> {
+  try {
+    const db = await createClient()
+    const { data } = await db
+      .from("game_settings")
+      .select("value")
+      .eq("key", "buyer_protection_rate")
+      .single()
+
+    const rate = Number(data?.value)
+    if (Number.isFinite(rate) && rate >= 0 && rate <= MAX_BUYER_PROTECTION_RATE) {
+      return rate
+    }
+  } catch {
+    // fall through to the default
+  }
+  return DEFAULT_BUYER_PROTECTION_RATE
 }

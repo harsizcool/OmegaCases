@@ -32,6 +32,7 @@ var order = []string{
 	"002_zites_and_pools.sql",
 	"003_atomic_mining_and_balance_fixes.sql",
 	"004_app_schema_alignment.sql",
+	"005_buyer_protection.sql",
 	"add-case-prices-setting.sql",
 }
 

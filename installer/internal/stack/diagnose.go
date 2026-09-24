@@ -49,6 +49,7 @@ func (s *Stack) Diagnose() []Check {
 		add(s.checkImageHasInternalRewrite())
 		add(s.checkAnonRead())
 		add(s.checkServiceWrite())
+		add(s.checkStorage())
 	}
 
 	// The end-to-end one: the site's own server doing a write, which is what
@@ -201,6 +202,103 @@ func (s *Stack) checkServiceWrite() Check {
 			Detail: fmt.Sprintf("replied %d: %s", status, short(body)), Hint: hint}
 	}
 	return Check{Name: "Writing data (what sign-ups use)", OK: true, Detail: "working"}
+}
+
+// checkStorage exercises what profile pictures and item images depend on: the
+// buckets existing, an upload being accepted, and the uploaded file being
+// readable back at its public address. Reading back is the half that matters —
+// an upload can succeed while the address the site then shows returns nothing.
+func (s *Stack) checkStorage() Check {
+	_, service := s.cfg.Keys()
+	const name = "Pictures (profile and item images)"
+
+	status, body, err := s.apiRequest("GET", "/storage/v1/bucket", service, nil)
+	if err != nil {
+		return Check{Name: name, Detail: err.Error(),
+			Hint: "The picture service is not answering. Check its logs:\n    setup logs storage"}
+	}
+	if status != http.StatusOK {
+		return Check{Name: name, Detail: fmt.Sprintf("cannot list buckets: %d %s", status, short(body)),
+			Hint: "The picture service is rejecting the site's key. Run setup again\n" +
+				"and let it finish, so the buckets are created."}
+	}
+
+	var buckets []struct {
+		Name   string `json:"name"`
+		Public bool   `json:"public"`
+	}
+	_ = json.Unmarshal(body, &buckets)
+
+	found := map[string]bool{}
+	private := []string{}
+	for _, b := range buckets {
+		found[b.Name] = true
+		if !b.Public {
+			private = append(private, b.Name)
+		}
+	}
+
+	var missing []string
+	for _, want := range []string{"avatars", "itemstuffs"} {
+		if !found[want] {
+			missing = append(missing, want)
+		}
+	}
+	if len(missing) > 0 {
+		return Check{Name: name,
+			Detail: "missing storage for " + strings.Join(missing, " and "),
+			Hint: "This is why profile pictures and item images do not work. Setup\n" +
+				"creates these when it finishes; run it again and let it through to\n" +
+				"the end.",
+		}
+	}
+	if len(private) > 0 {
+		return Check{Name: name,
+			Detail: "not public: " + strings.Join(private, ", "),
+			Hint: "Pictures upload but cannot be displayed, because the bucket is\n" +
+				"private. Run setup again to correct it.",
+		}
+	}
+
+	// A real round trip: upload, fetch back without any key, then remove.
+	path := fmt.Sprintf("/storage/v1/object/avatars/_omega_check/%d.txt", time.Now().Unix())
+	status, body, err = s.apiRequest("POST", path, service, []byte("omegacases storage check"))
+	if err != nil || status >= 300 {
+		detail := "upload refused"
+		if err != nil {
+			detail = err.Error()
+		} else {
+			detail = fmt.Sprintf("upload refused: %d %s", status, short(body))
+		}
+		return Check{Name: name, Detail: detail,
+			Hint: "Uploading a picture will fail the same way. If this mentions a row\n" +
+				"or permission, run setup again and let it apply the database scripts;\n" +
+				"otherwise check:\n    setup logs storage",
+		}
+	}
+	defer func() { _, _, _ = s.apiRequest("DELETE", path, service, nil) }()
+
+	// Public read, deliberately with no key at all, exactly as a browser does.
+	publicPath := strings.Replace(path, "/object/avatars/", "/object/public/avatars/", 1)
+	req, err := http.NewRequest("GET", s.cfg.SupabaseEndpoint()+publicPath, nil)
+	if err != nil {
+		return Check{Name: name, Detail: err.Error()}
+	}
+	resp, err := s.probeClient().Do(req)
+	if err != nil {
+		return Check{Name: name, Detail: err.Error(),
+			Hint: "Uploads work but the address the site shows cannot be reached."}
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return Check{Name: name,
+			Detail: fmt.Sprintf("uploaded, but reading it back gave %d", resp.StatusCode),
+			Hint: "Pictures will upload and then show as broken images, because the\n" +
+				"address they are served from is not reachable. Run setup again to\n" +
+				"rewrite the proxy configuration, which is what serves them.",
+		}
+	}
+	return Check{Name: name, OK: true, Detail: "upload and display both working"}
 }
 
 // checkSignup creates a throwaway account through the site's own sign-up page,

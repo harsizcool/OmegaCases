@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/lib/auth-context"
 import type { Item, Rarity } from "@/lib/types"
 import { RARITY_COLORS } from "@/lib/types"
+import { DEFAULT_BUYER_PROTECTION_RATE, MAX_BUYER_PROTECTION_RATE } from "@/lib/game-settings-shared"
 import { useRouter } from "next/navigation"
 import { UserManager } from "@/components/admin/user-manager"
 import { ItemEditor } from "@/components/admin/item-editor"
@@ -76,6 +77,11 @@ export default function AdminPage() {
   const [arcadeSuccess, setArcadeSuccess] = useState(false)
   const [arcadeError, setArcadeError] = useState("")
 
+  const [protectionRate, setProtectionRate] = useState(String(DEFAULT_BUYER_PROTECTION_RATE * 100))
+  const [bpSaving, setBpSaving] = useState(false)
+  const [bpSuccess, setBpSuccess] = useState(false)
+  const [bpError, setBpError] = useState("")
+
   const [paymentsPaused, setPaymentsPaused] = useState(true)
   const [ppSaving, setPpSaving] = useState(false)
   const [ppSuccess, setPpSuccess] = useState(false)
@@ -94,6 +100,25 @@ export default function AdminPage() {
       setPaymentsPaused(val)
       setPpSuccess(true)
     } catch (e: any) { setPpError(e.message) } finally { setPpSaving(false) }
+  }
+
+  // Stored as a fraction, entered as a percentage: 5 in the box means 0.05.
+  const saveBuyerProtection = async () => {
+    setBpSaving(true); setBpError(""); setBpSuccess(false)
+    try {
+      if (!user?.id) throw new Error("Not authenticated")
+      const pct = parseFloat(protectionRate)
+      if (!Number.isFinite(pct) || pct < 0 || pct > MAX_BUYER_PROTECTION_RATE * 100) {
+        throw new Error(`Enter a percentage between 0 and ${MAX_BUYER_PROTECTION_RATE * 100}`)
+      }
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "buyer_protection_rate", value: pct / 100, user_id: user.id }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error || "Failed") }
+      setBpSuccess(true)
+    } catch (e: any) { setBpError(e.message) } finally { setBpSaving(false) }
   }
 
   const saveCasePrices = async () => {
@@ -165,6 +190,9 @@ export default function AdminPage() {
       if (data.arcade_house_edge !== undefined) setArcadeHouseEdge(String(data.arcade_house_edge))
       if (data.arcade_min_bet !== undefined) setArcadeMinBet(String(data.arcade_min_bet))
       if (data.arcade_max_bet !== undefined) setArcadeMaxBet(String(data.arcade_max_bet))
+      if (data.buyer_protection_rate !== undefined) {
+        setProtectionRate(String(Number(data.buyer_protection_rate) * 100))
+      }
     } catch {}
     setCapsLoading(false)
   }
@@ -462,6 +490,46 @@ export default function AdminPage() {
             </div>
             {ppError && <Alert variant="destructive" className="mt-2"><AlertDescription>{ppError}</AlertDescription></Alert>}
             {ppSuccess && <Alert className="mt-2"><AlertDescription className="text-green-600">Payments setting saved!</AlertDescription></Alert>}
+          </div>
+
+          {/* Buyer protection fee */}
+          <div>
+            <h3 className="text-sm font-bold mb-1">Buyer Protection Fee</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Added on top of the price when someone buys a marketplace listing. The seller still
+              receives the full amount they asked for; this part goes to the site. Set it to 0 to
+              charge nothing.
+            </p>
+            <div className="flex items-end gap-2 flex-wrap">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">Fee (%)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    step={0.1}
+                    min={0}
+                    max={MAX_BUYER_PROTECTION_RATE * 100}
+                    value={protectionRate}
+                    onChange={e => setProtectionRate(e.target.value)}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+              <Button className="gap-2" disabled={bpSaving} onClick={saveBuyerProtection}>
+                {bpSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {bpSaving ? "Saving..." : "Save Fee"}
+              </Button>
+            </div>
+            <p className="text-[0.7rem] text-muted-foreground mt-2">
+              On a $10.00 listing a buyer pays{" "}
+              <strong className="text-foreground">
+                ${(10 + 10 * (parseFloat(protectionRate || "0") / 100)).toFixed(2)}
+              </strong>
+              , of which ${(10 * (parseFloat(protectionRate || "0") / 100)).toFixed(2)} is the fee.
+            </p>
+            {bpError && <Alert variant="destructive" className="mt-2"><AlertDescription>{bpError}</AlertDescription></Alert>}
+            {bpSuccess && <Alert className="mt-2"><AlertDescription className="text-green-600">Buyer protection fee saved!</AlertDescription></Alert>}
           </div>
 
           {/* Rarity price caps */}
