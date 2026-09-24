@@ -33,6 +33,7 @@ var order = []string{
 	"003_atomic_mining_and_balance_fixes.sql",
 	"004_app_schema_alignment.sql",
 	"005_buyer_protection.sql",
+	"006_support_tickets.sql",
 	"add-case-prices-setting.sql",
 }
 
@@ -190,9 +191,12 @@ var expected = map[string][]string{
 	"rolls":         {"id", "user_id", "item_id", "server_seed", "server_seed_hash", "client_seed", "nonce", "created_at"},
 	"trades": {"id", "sender_id", "receiver_id", "sender_balance", "receiver_balance",
 		"status", "created_at", "updated_at"},
-	"trade_items":  {"id", "trade_id", "inventory_id", "side"},
-	"oauth_apps":   {"id", "user_id", "name", "client_id", "client_secret", "scopes"},
-	"oauth_tokens": {"id", "app_id", "user_id", "token", "scopes", "last_used_at"},
+	"trade_items": {"id", "trade_id", "inventory_id", "side"},
+	"support_tickets": {"id", "user_id", "subject", "category", "status",
+		"last_message_at", "unread_for_user", "unread_for_staff", "created_at"},
+	"support_messages": {"id", "ticket_id", "author_id", "from_staff", "body", "created_at"},
+	"oauth_apps":       {"id", "user_id", "name", "client_id", "client_secret", "scopes"},
+	"oauth_tokens":     {"id", "app_id", "user_id", "token", "scopes", "last_used_at"},
 	"oauth_requests": {"id", "user_id", "service_name", "callback_url", "redirect_url",
 		"get_user_id", "get_username", "get_balance"},
 	"mining_pools": {"id", "owner_id", "name", "host", "port", "status", "api_key_hash",

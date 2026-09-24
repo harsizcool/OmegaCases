@@ -16,6 +16,7 @@ import { DEFAULT_BUYER_PROTECTION_RATE, MAX_BUYER_PROTECTION_RATE } from "@/lib/
 import { useRouter } from "next/navigation"
 import { UserManager } from "@/components/admin/user-manager"
 import { ItemEditor } from "@/components/admin/item-editor"
+import { SupportPanel } from "@/components/admin/support-panel"
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Legendary", "Omega"]
 
@@ -294,7 +295,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-border mb-6">
-        {["Items", "Add Item", "Settings", "Accounts"].map((label, i) => (
+        {["Items", "Add Item", "Settings", "Accounts", "Support"].map((label, i) => (
           <button
             key={label}
             onClick={() => setTab(i)}
@@ -700,6 +701,9 @@ export default function AdminPage() {
 
       {/* Accounts tab */}
       {tab === 3 && <UserManager />}
+
+      {/* Support tab */}
+      {tab === 4 && <SupportPanel />}
 
       {editing && (
         <ItemEditor

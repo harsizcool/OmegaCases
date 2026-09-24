@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import NextLink from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { motion } from "motion/react"
-import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown, Sparkles, Cpu } from "lucide-react"
+import { Menu, Layers, Search, Crown, LogOut, User, Settings, ShieldCheck, Store, ArrowLeftRight, Trophy, X, MessageSquare, Code2, Swords, ChevronDown, Sparkles, Cpu, LifeBuoy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -436,6 +436,11 @@ export default function Navbar() {
                         </NextLink>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <NextLink href="/support" className="flex items-center gap-2 cursor-pointer">
+                          <LifeBuoy size={13} /> Support
+                        </NextLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <NextLink href="/developer" className="flex items-center gap-2 cursor-pointer">
                           <Code2 size={13} /> Developer
                         </NextLink>
@@ -576,6 +581,9 @@ export default function Navbar() {
                       </NextLink>
                       <NextLink href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                         <Settings size={15} /> Settings
+                      </NextLink>
+                      <NextLink href="/support" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <LifeBuoy size={15} /> Support
                       </NextLink>
                           <NextLink href="/developer" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                         <Code2 size={15} /> Developer
